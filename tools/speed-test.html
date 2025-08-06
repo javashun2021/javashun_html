@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Network Speed Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f2f5;
+      text-align: center;
+      padding: 3rem;
+    }
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 2rem;
+    }
+    #result {
+      font-size: 1.5rem;
+      margin-top: 1.5rem;
+      color: #007bff;
+    }
+    button {
+      padding: 0.8rem 2rem;
+      font-size: 1rem;
+      border: none;
+      background: #007bff;
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:disabled {
+      background: #aaa;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🧪 Network Speed Test</h1>
+  <button id="testBtn" onclick="startSpeedTest()">Start Test</button>
+  <div id="result">Your speed will appear here...</div>
+
+  <script>
+    function startSpeedTest() {
+      const btn = document.getElementById("testBtn");
+      const result = document.getElementById("result");
+
+      // 禁用按钮并提示测速中
+      btn.disabled = true;
+      result.innerText = "⏳ Testing... Please wait";
+
+      const imageSizeInBytes = 5 * 1024 * 1024; // 5MB
+      const imageUrl = "https://upload.wikimedia.org/wikipedia/commons/3/3f/Fronalpstock_big.jpg?cache=" + Math.random();
+
+      const startTime = new Date().getTime();
+
+      const img = new Image();
+      img.onload = function() {
+        const endTime = new Date().getTime();
+        const durationInSeconds = (endTime - startTime) / 1000;
+        const bitsLoaded = imageSizeInBytes * 8;
+        const speedMbps = (bitsLoaded / durationInSeconds / 1024 / 1024).toFixed(2);
+
+        result.innerText = `📶 Download Speed: ${speedMbps} Mbps`;
+        btn.disabled = false;
+      };
+
+      img.onerror = function() {
+        result.innerText = "❌ Failed to load test image.";
+        btn.disabled = false;
+      };
+
+      img.src = imageUrl;
+    }
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Javashun.com - Developer Hub</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; background: #f0f2f5; }
+    header, footer { background: #20232a; color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+    main { padding: 2rem; }
+    h2 { border-bottom: 2px solid #eee; padding-bottom: 0.5rem; }
+    .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; margin-top: 1rem; }
+    .card {
+      background: white; padding: 1rem; border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      transition: transform 0.2s ease;
+    }
+    .card:hover { transform: translateY(-4px); }
+    .card a {
+      text-decoration: none;
+      color: #007bff;
+      font-weight: bold;
+    }
+    .language-toggle {
+      cursor: pointer;
+      background: #444;
+      color: white;
+      padding: 5px 10px;
+      border-radius: 4px;
+    }
+    @media (max-width: 600px) {
+      header, footer { flex-direction: column; text-align: center; gap: 0.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div><strong>Javashun.com</strong></div>
+    <div id="ip-display" style="text-align: center; font-size: 2rem; margin-bottom: 2rem;">
+      IP: <span id="ip-value">Loading...</span>
+    </div>
+    <div id="region-display" style="text-align: center; font-size: 1.8rem; margin-bottom: 2rem;">
+  📍  <span id="region-text">Loading location...</span>
+    </div>
+    <div class="language-toggle" onclick="toggleLanguage()">🌐 <span id="lang-code">EN</span>
+    </div>
+  
+  </header>
+
+  <main>
+    <!-- 开放 API -->
+    <section>
+      <h2 data-en="Open API" data-zh="开放 API">Open API</h2>
+      <div class="card-grid">
+        <div class="card">
+          <a href="/api/register" target="_blank" data-en="Register API" data-zh="注册接口">Register API</a>
+        </div>
+        <div class="card">
+          <a href="/api/login" target="_blank" data-en="Login API" data-zh="登入接口">Login API</a>
+        </div>
+        <div class="card">
+          <a href="/api/resources" target="_blank" data-en="Resource Menu API" data-zh="资源菜单接口">Resource Menu API</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- 开发工具 -->
+    <section style="margin-top: 3rem;">
+      <h2 data-en="Developer Tools" data-zh="开发工具">Developer Tools</h2>
+      <div class="card-grid">
+        <div class="card">
+          <a href="tools/json-format.html" target="_blank" data-en="JSON Formatter" data-zh="JSON 格式化">JSON Formatter</a>
+        </div>
+        <div class="card">
+          <a href="tools/image-base64.html" target="_blank" data-en="Image to Base64" data-zh="图片与Base64">Image&Base64</a>
+        </div>
+        <div class="card">
+          <a href="tools/speed-test.html" target="_blank" data-en="Speed Internet" data-zh="网速测试">SpeedInternet</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div>© 2025 Javashun.com</div>
+  </footer>
+
+  <script>
+    function toggleLanguage() {
+      const currentLang = document.getElementById("lang-code").innerText;
+      const newLang = currentLang === "EN" ? "ZH" : "EN";
+      document.getElementById("lang-code").innerText = newLang;
+
+      document.querySelectorAll("[data-en]").forEach(el => {
+        el.innerText = el.getAttribute(newLang === "EN" ? "data-en" : "data-zh");
+      });
+    }
+
+     // 获取区域信息
+  fetch('http://ip-api.com/json/')
+    .then(res => res.json())
+    .then(data => {
+      const regionInfo = `${data.country}, ${data.regionName}, ${data.city}`;
+      document.getElementById('region-text').innerText = regionInfo;
+    })
+    .catch(() => {
+      document.getElementById('region-text').innerText = 'Location unavailable';
+    });
+
+  // 多语言切换
+  function toggleLanguage() {
+    const currentLang = document.getElementById("lang-code").innerText;
+    const newLang = currentLang === "EN" ? "ZH" : "EN";
+    document.getElementById("lang-code").innerText = newLang;
+
+    document.querySelectorAll("[data-en]").forEach(el => {
+      el.innerText = el.getAttribute(newLang === "EN" ? "data-en" : "data-zh");
+    });
+  }
+
+    // 获取用户公网 IP 地址
+  fetch('https://api.ipify.org?format=json')
+    .then(response => response.json())
+    .then(data => {
+      document.getElementById('ip-value').innerText = data.ip;
+    })
+    .catch(() => {
+      document.getElementById('ip-value').innerText = 'Unavailable';
+    });
+  </script>
+</body>
+</html>

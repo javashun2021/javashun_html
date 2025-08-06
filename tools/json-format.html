@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>JSON Formatter</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 800px;
+      margin: auto;
+    }
+    textarea {
+      width: 100%;
+      height: 200px;
+      font-family: monospace;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    pre {
+      background: #f3f3f3;
+      padding: 10px;
+      border: 1px solid #ddd;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font-size: 14px;
+    }
+    .error {
+      color: red;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+    .copy-btn {
+      margin-top: 10px;
+      padding: 10px 15px;
+      font-size: 16px;
+      cursor: pointer;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+    }
+    .copy-btn:hover {
+      background-color: #45a049;
+    }
+
+    @media (max-width: 600px) {
+      body {
+        padding: 10px;
+      }
+      textarea {
+        height: 150px;
+        font-size: 13px;
+      }
+      pre {
+        font-size: 13px;
+        padding: 8px;
+      }
+      .copy-btn {
+        width: 100%;
+        font-size: 15px;
+        padding: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <h2 data-i18n="inputTitle">Input Text (will be formatted into JSON)</h2>
+  <textarea id="inputArea" placeholder='{"name": "shun", "lang": "Java"}'></textarea>
+
+  <h3 data-i18n="resultTitle">Formatted Result:</h3>
+  <pre id="outputArea"></pre>
+  <button id="copyBtn" class="copy-btn" style="display:none;" data-i18n="copyBtn">📋 Copy Result</button>
+  <div id="errorMsg" class="error"></div>
+
+  <script>
+    const inputArea = document.getElementById("inputArea");
+    const outputArea = document.getElementById("outputArea");
+    const errorMsg = document.getElementById("errorMsg");
+    const copyBtn = document.getElementById("copyBtn");
+
+    // 多语言字典
+    const i18n = {
+      en: {
+        inputTitle: "Input Text (will be formatted into JSON)",
+        resultTitle: "Formatted Result:",
+        copyBtn: "📋 Copy Result",
+        copySuccess: "✅ Copied!",
+        copyFail: "❌ Copy failed. Please copy manually.",
+        jsonError: "⚠️ JSON Parse Error: "
+      },
+      zh: {
+        inputTitle: "输入文本（自动转为标准 JSON）",
+        resultTitle: "格式化结果：",
+        copyBtn: "📋 复制结果",
+        copySuccess: "✅ 已复制！",
+        copyFail: "❌ 复制失败，请手动复制。",
+        jsonError: "⚠️ JSON 解析错误："
+      }
+    };
+
+    // 检测语言
+    const lang = navigator.language.startsWith("zh") ? "zh" : "en";
+    const textDict = i18n[lang];
+
+    // 设置语言文本
+    function setLanguageText() {
+      document.querySelectorAll("[data-i18n]").forEach(el => {
+        const key = el.getAttribute("data-i18n");
+        if (textDict[key]) {
+          el.textContent = textDict[key];
+        }
+      });
+    }
+
+    setLanguageText();
+
+    inputArea.addEventListener("input", () => {
+      const text = inputArea.value.trim();
+      if (!text) {
+        outputArea.textContent = "";
+        errorMsg.textContent = "";
+        copyBtn.style.display = "none";
+        return;
+      }
+
+      try {
+        const json = JSON.parse(text);
+        const formatted = JSON.stringify(json, null, 2);
+        outputArea.textContent = formatted;
+        errorMsg.textContent = "";
+        copyBtn.style.display = "inline-block";
+      } catch (e) {
+        outputArea.textContent = "";
+        errorMsg.textContent = textDict.jsonError + e.message;
+        copyBtn.style.display = "none";
+      }
+    });
+
+    copyBtn.addEventListener("click", () => {
+      const text = outputArea.textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        copyBtn.textContent = textDict.copySuccess;
+        setTimeout(() => {
+          copyBtn.textContent = textDict.copyBtn;
+        }, 1500);
+      }).catch(() => {
+        alert(textDict.copyFail);
+      });
+    });
+  </script>
+
+</body>
+</html>
