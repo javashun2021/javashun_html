@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Timestamp Converter | 时间戳转换工具</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f4f6f8;
+      color: #333;
+    }
+
+    header {
+      background: #4A90E2;
+      color: white;
+      padding: 1em;
+      text-align: center;
+      font-size: 1.5em;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 30px auto;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+      padding: 20px;
+    }
+
+    label {
+      display: block;
+      margin: 1em 0 0.5em;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      font-size: 1em;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+
+    button {
+      margin-top: 1em;
+      width: 100%;
+      padding: 12px;
+      background: #4A90E2;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 1em;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #357ABD;
+    }
+
+    .current-timestamp {
+      font-size: 1.2em;
+      text-align: center;
+      margin-bottom: 20px;
+      background: #eaf1f8;
+      padding: 10px;
+      border-radius: 6px;
+    }
+
+    .lang-toggle {
+      float: right;
+      cursor: pointer;
+      color: #fff;
+      font-size: 0.9em;
+    }
+
+    @media (max-width: 600px) {
+      header {
+        font-size: 1.2em;
+      }
+
+      .container {
+        margin: 15px;
+        padding: 15px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <span id="title">Timestamp Converter</span>
+  <span class="lang-toggle" onclick="toggleLang()">中/EN</span>
+</header>
+
+<div class="container">
+  <div class="current-timestamp" id="currentTimestamp">
+    Current Unix Timestamp: <span id="now">--</span>
+  </div>
+
+  <label id="labelUnix">Unix Timestamp:</label>
+  <input type="text" id="timestampInput" placeholder="Enter timestamp">
+  <button onclick="convertToDate()" id="btnToDate">Convert to Date</button>
+
+  <label id="labelDate">Date (yyyy-MM-dd HH:mm:ss):</label>
+  <input type="text" id="dateInput" placeholder="Enter date">
+  <button onclick="convertToTimestamp()" id="btnToTimestamp">Convert to Timestamp</button>
+</div>
+
+<script>
+  function updateCurrentTimestamp() {
+    document.getElementById('now').innerText = Math.floor(Date.now() / 1000);
+  }
+  setInterval(updateCurrentTimestamp, 1000);
+  updateCurrentTimestamp();
+
+  function convertToDate() {
+    const ts = parseInt(document.getElementById('timestampInput').value);
+    if (!isNaN(ts)) {
+      const date = new Date(ts * 1000);
+      document.getElementById('dateInput').value = date.toISOString().slice(0, 19).replace('T', ' ');
+    } else {
+      alert('Invalid timestamp');
+    }
+  }
+
+  function convertToTimestamp() {
+    const dateStr = document.getElementById('dateInput').value;
+    const date = new Date(dateStr.replace(/-/g, '/'));
+    if (!isNaN(date.getTime())) {
+      document.getElementById('timestampInput').value = Math.floor(date.getTime() / 1000);
+    } else {
+      alert('Invalid date format');
+    }
+  }
+
+  let currentLang = navigator.language.startsWith('zh') ? 'zh' : 'en';
+
+  const i18n = {
+    en: {
+      title: 'Timestamp Converter',
+      labelUnix: 'Unix Timestamp:',
+      labelDate: 'Date (yyyy-MM-dd HH:mm:ss):',
+      btnToDate: 'Convert to Date',
+      btnToTimestamp: 'Convert to Timestamp',
+      nowLabel: 'Current Unix Timestamp:'
+    },
+    zh: {
+      title: '时间戳转换工具',
+      labelUnix: 'Unix时间戳：',
+      labelDate: '日期格式（yyyy-MM-dd HH:mm:ss）：',
+      btnToDate: '转换为日期',
+      btnToTimestamp: '转换为时间戳',
+      nowLabel: '当前Unix时间戳：'
+    }
+  };
+
+  function applyLang() {
+    const langSet = i18n[currentLang];
+    document.getElementById('title').innerText = langSet.title;
+    document.getElementById('labelUnix').innerText = langSet.labelUnix;
+    document.getElementById('labelDate').innerText = langSet.labelDate;
+    document.getElementById('btnToDate').innerText = langSet.btnToDate;
+    document.getElementById('btnToTimestamp').innerText = langSet.btnToTimestamp;
+    document.getElementById('currentTimestamp').firstChild.nodeValue = langSet.nowLabel + ' ';
+  }
+
+  function toggleLang() {
+    currentLang = currentLang === 'en' ? 'zh' : 'en';
+    applyLang();
+  }
+
+  applyLang();
+</script>
+
+</body>
+</html>
