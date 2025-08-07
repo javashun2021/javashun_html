@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Image Compressor</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f4f6f9;
+      color: #333;
+    }
+
+    header {
+      background-color: #3f51b5;
+      color: white;
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .lang-toggle {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      background: #ffffff33;
+      border: none;
+      padding: 0.3rem 0.8rem;
+      border-radius: 8px;
+      cursor: pointer;
+      color: white;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: auto;
+      padding: 2rem;
+    }
+
+    .upload-area {
+      border: 2px dashed #ccc;
+      padding: 2rem;
+      border-radius: 10px;
+      text-align: center;
+      background: white;
+      transition: background 0.3s;
+    }
+
+    .upload-area.dragover {
+      background: #e3f2fd;
+      border-color: #2196f3;
+    }
+
+    .image-list {
+      margin-top: 2rem;
+    }
+
+    .image-item {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      background: white;
+    }
+
+    .image-item p {
+      margin: 0.3rem 0;
+    }
+
+    @media (max-width: 600px) {
+      .container {
+        padding: 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1 id="title">Image Compressor</h1>
+    <button class="lang-toggle" onclick="toggleLang()">中 / EN</button>
+  </header>
+
+  <div class="container">
+    <div id="uploadArea" class="upload-area">
+      <p id="uploadText">Drag and drop images here or click to upload</p>
+      <input type="file" id="fileInput" accept="image/*" multiple style="display: none;" />
+    </div>
+
+    <div id="imageList" class="image-list"></div>
+  </div>
+
+  <script>
+    const langData = {
+      en: {
+        title: "Image Compressor",
+        uploadText: "Drag and drop images here or click to upload",
+        original: "Original Size",
+        compressed: "Compressed Size",
+        download: "Download"
+      },
+      zh: {
+        title: "图片压缩工具",
+        uploadText: "拖拽图片到此区域，或点击上传",
+        original: "原图大小",
+        compressed: "压缩后大小",
+        download: "下载"
+      }
+    };
+
+    let currentLang = 'en';
+
+    function toggleLang() {
+      currentLang = currentLang === 'en' ? 'zh' : 'en';
+      applyLang();
+    }
+
+    function applyLang() {
+      const t = langData[currentLang];
+      document.getElementById('title').innerText = t.title;
+      document.getElementById('uploadText').innerText = t.uploadText;
+      document.querySelectorAll('.image-item').forEach(el => {
+        const original = el.querySelector('[data-type="original"]');
+        const compressed = el.querySelector('[data-type="compressed"]');
+        const download = el.querySelector('[data-type="download"]');
+        if (original) original.innerText = `${t.original}: ${original.dataset.size}`;
+        if (compressed) compressed.innerText = `${t.compressed}: ${compressed.dataset.size}`;
+        if (download) download.innerText = t.download;
+      });
+    }
+
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 Bytes';
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    function handleFiles(files) {
+      [...files].forEach(file => {
+        const reader = new FileReader();
+        reader.onload = e => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+
+            const maxWidth = 800;
+            const scale = Math.min(maxWidth / img.width, 1);
+            canvas.width = img.width * scale;
+            canvas.height = img.height * scale;
+
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            canvas.toBlob(blob => {
+              const compressedUrl = URL.createObjectURL(blob);
+              const originalSize = formatBytes(file.size);
+              const compressedSize = formatBytes(blob.size);
+              const t = langData[currentLang];
+
+              const div = document.createElement('div');
+              div.className = 'image-item';
+              div.innerHTML = `
+                <p data-type="original" data-size="${originalSize}">${t.original}: ${originalSize}</p>
+                <p data-type="compressed" data-size="${compressedSize}">${t.compressed}: ${compressedSize}</p>
+                <a data-type="download" href="${compressedUrl}" download="${file.name}">${t.download}</a>
+              `;
+              document.getElementById('imageList').appendChild(div);
+            }, 'image/jpeg', 0.7); // quality 70%
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+
+    uploadArea.addEventListener('click', () => fileInput.click());
+    uploadArea.addEventListener('dragover', e => {
+      e.preventDefault();
+      uploadArea.classList.add('dragover');
+    });
+    uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+    uploadArea.addEventListener('drop', e => {
+      e.preventDefault();
+      uploadArea.classList.remove('dragover');
+      if (e.dataTransfer.files.length > 0) {
+        handleFiles(e.dataTransfer.files);
+      }
+    });
+
+    fileInput.addEventListener('change', e => {
+      if (e.target.files.length > 0) {
+        handleFiles(e.target.files);
+      }
+    });
+
+    applyLang(); // Initialize language
+  </script>
+</body>
+</html>
