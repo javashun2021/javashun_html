@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>JPG → PNG 转换器（离线本地版）</title>
+  <style>
+    :root{
+      --bg:#0b1320; --card:#101a2b; --muted:#7d8aa1; --text:#eaf2ff; --accent:#4cc9f0; --accent2:#90ee90; --danger:#ff6b6b;
+      --border:rgba(255,255,255,.08); --shadow: 0 10px 30px rgba(0,0,0,.35);
+    }
+    *{box-sizing:border-box}
+    body{margin:0; font:16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background:linear-gradient(145deg,#08101e,#0f1c33 60%,#14213d); color:var(--text);} 
+    .container{max-width:980px; margin:40px auto; padding:0 16px}
+    header{display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px}
+    h1{font-size:28px; margin:0; letter-spacing:.5px}
+    .desc{color:var(--muted)}
+    .card{background:var(--card); border:1px solid var(--border); border-radius:20px; box-shadow:var(--shadow)}
+    .u-flex{display:flex; gap:14px; align-items:center}
+
+    .drop{border:2px dashed rgba(255,255,255,.15); padding:28px; border-radius:18px; text-align:center; transition:.25s ease all; cursor:pointer}
+    .drop:hover{border-color:var(--accent); background:rgba(76,201,240,.06)}
+
+    .btn{appearance:none; border:1px solid var(--border); background:#15243e; color:var(--text); padding:10px 14px; border-radius:12px; cursor:pointer; transition:.2s; font-weight:600}
+    .btn:hover{transform:translateY(-1px); box-shadow:0 6px 16px rgba(0,0,0,.35)}
+    .btn-primary{background:linear-gradient(135deg,#1f6feb,#4cc9f0); border-color:transparent}
+    .btn-ghost{background:#0f1b31}
+    .btn-danger{background:#2a0f18}
+
+    .toolbar{display:flex; gap:10px; justify-content:space-between; flex-wrap:wrap}
+    .actions{display:flex; gap:10px; flex-wrap:wrap}
+
+    .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px}
+
+    .item{background:#0f1b31; border:1px solid var(--border); border-radius:16px; overflow:hidden; display:flex; flex-direction:column}
+    .thumb{aspect-ratio:1.6/1; width:100%; background:#0b1528; display:grid; place-items:center}
+    .thumb img{max-width:100%; max-height:100%; object-fit:contain}
+    .meta{padding:12px}
+    .name{font-weight:600; font-size:14px; word-break:break-all}
+    .bad{color:var(--danger); font-size:13px}
+
+    footer{opacity:.8; text-align:center; margin-top:24px; color:var(--muted)}
+    .hint{font-size:14px; color:var(--muted)}
+    .chips{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px}
+    .chip{font-size:12px; padding:4px 8px; border-radius:999px; background:#0e1730; border:1px solid var(--border)}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>JPG → PNG 转换器</h1>
+        <div class="desc">纯前端、无需上传，支持拖拽/多选/批量下载（转换都在你的浏览器中离线完成）。</div>
+      </div>
+      <button id="clearAll" class="btn btn-ghost" title="清空当前列表">清空</button>
+    </header>
+
+    <div class="card" style="padding:18px; margin-bottom:14px">
+      <div class="toolbar">
+        <label class="u-flex btn btn-primary" for="fileInput" style="gap:8px">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 16V4M12 4l-3 3M12 4l3 3" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          选择 JPG 文件
+          <input id="fileInput" type="file" accept="image/jpeg,image/jpg" multiple hidden />
+        </label>
+        <div class="actions">
+          <button id="downloadAll" class="btn">下载全部 PNG</button>
+        </div>
+      </div>
+      <div id="dropZone" class="drop" style="margin-top:12px">
+        将 <b>JPG/JPEG</b> 图片拖拽到这里，或点击上方按钮选择文件
+        <div class="chips">
+          <span class="chip">本地转换</span>
+          <span class="chip">不压缩</span>
+          <span class="chip">保留分辨率</span>
+        </div>
+      </div>
+      <div class="hint" style="margin-top:10px">注意：PNG 是无损格式，体积可能比 JPG 大；浏览器已自动处理大多数照片的方向信息。</div>
+    </div>
+
+    <section id="grid" class="grid"></section>
+
+    <footer>© JPG → PNG Converter · 纯 HTML/JS/CSS 单文件</footer>
+  </div>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const dropZone = document.getElementById('dropZone');
+    const grid = document.getElementById('grid');
+    const downloadAllBtn = document.getElementById('downloadAll');
+    const clearAllBtn = document.getElementById('clearAll');
+
+    /** 保存转换结果：{ name, blobUrl, width, height } */
+    let results = [];
+
+    // 工具：替换扩展名为 .png
+    function toPngName(name){
+      const idx = name.lastIndexOf('.');
+      return (idx>0 ? name.slice(0, idx) : name) + '.png';
+    }
+
+    // 工具：创建元素
+    function h(tag, attrs={}, ...children){
+      const el = document.createElement(tag);
+      for(const k in attrs){
+        if(k === 'class') el.className = attrs[k];
+        else if(k === 'style') el.style.cssText = attrs[k];
+        else if(k.startsWith('on') && typeof attrs[k] === 'function') el.addEventListener(k.slice(2), attrs[k]);
+        else el.setAttribute(k, attrs[k]);
+      }
+      children.forEach(c=>{
+        if(c==null) return; 
+        if(typeof c === 'string') el.appendChild(document.createTextNode(c));
+        else el.appendChild(c);
+      });
+      return el;
+    }
+
+    // 将 File 转为 PNG Blob URL，并返回信息
+    async function convertFileToPNG(file){
+      if(!(file.type === 'image/jpeg' || /\.(jpe?g)$/i.test(file.name))){
+        throw new Error('只支持 JPG/JPEG 文件');
+      }
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      try{
+        await new Promise((res, rej)=>{
+          img.onload = ()=> res();
+          img.onerror = (e)=> rej(new Error('图片读取失败'));
+          img.src = objectUrl;
+        });
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        const blob = await new Promise(r=> canvas.toBlob(r, 'image/png'));
+        const blobUrl = URL.createObjectURL(blob);
+        return { name: toPngName(file.name), blobUrl, width: canvas.width, height: canvas.height, previewSrc: objectUrl };
+      } finally {
+        // 保留原始 objectUrl 供预览用，下载链接另有 blobUrl
+      }
+    }
+
+    function addItemCard(info){
+      const card = h('div', { class:'item' });
+      const thumb = h('div', { class:'thumb' }, h('img', { src: info.previewSrc, alt: info.name }));
+      const meta = h('div', { class:'meta' });
+      const name = h('div', { class:'name' }, info.name);
+      const size = h('div', { class:'hint' }, `${info.width} × ${info.height}`);
+      const row = h('div', { class:'u-flex', style:'justify-content:space-between; margin-top:10px' });
+      const dl = h('a', { class:'btn', href: info.blobUrl, download: info.name }, '下载 PNG');
+      const rm = h('button', { class:'btn btn-ghost', onclick(){ 
+        // 从列表移除
+        const idx = results.indexOf(info);
+        if(idx>-1){ results.splice(idx,1); }
+        URL.revokeObjectURL(info.blobUrl);
+        grid.removeChild(card);
+      } }, '移除');
+      row.appendChild(dl); row.appendChild(rm);
+      meta.appendChild(name); meta.appendChild(size); meta.appendChild(row);
+      card.appendChild(thumb); card.appendChild(meta);
+      grid.prepend(card);
+    }
+
+    async function handleFiles(fileList){
+      const files = Array.from(fileList||[]);
+      if(!files.length) return;
+      for(const f of files){
+        try{
+          const info = await convertFileToPNG(f);
+          results.push(info);
+          addItemCard(info);
+        }catch(err){
+          const bad = h('div', { class:'item' },
+            h('div', { class:'thumb' }, h('div', { class:'bad' }, '无法处理：非 JPG/JPEG 或文件损坏')),
+            h('div', { class:'meta' }, h('div', { class:'name' }, f.name))
+          );
+          grid.prepend(bad);
+        }
+      }
+    }
+
+    // 拖拽交互
+    ;['dragenter','dragover'].forEach(ev=> dropZone.addEventListener(ev, e=>{ e.preventDefault(); dropZone.style.borderColor='var(--accent)'; }));
+    ;['dragleave','drop'].forEach(ev=> dropZone.addEventListener(ev, e=>{ e.preventDefault(); dropZone.style.borderColor='rgba(255,255,255,.15)'; }));
+    dropZone.addEventListener('drop', e=>{
+      const files = e.dataTransfer.files; handleFiles(files);
+    });
+
+    // 文件选择
+    fileInput.addEventListener('change', e=> handleFiles(e.target.files));
+
+    // 下载全部（逐个触发下载）
+    downloadAllBtn.addEventListener('click', ()=>{
+      if(!results.length) return alert('没有可下载的 PNG。');
+      // 逐个触发，避免被浏览器拦截
+      let i = 0;
+      const tick = ()=>{
+        const it = results[i++];
+        const a = document.createElement('a');
+        a.href = it.blobUrl; a.download = it.name; document.body.appendChild(a); a.click(); a.remove();
+        if(i < results.length) setTimeout(tick, 220);
+      };
+      tick();
+    });
+
+    // 清空
+    clearAllBtn.addEventListener('click', ()=>{
+      results.forEach(r=> URL.revokeObjectURL(r.blobUrl));
+      results = [];
+      grid.innerHTML = '';
+    });
+  </script>
+</body>
+</html>
