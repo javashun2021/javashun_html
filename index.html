@@ -157,15 +157,15 @@
     }
 
      // 获取区域信息
-  fetch('http://ip-api.com/json/')
-    .then(res => res.json())
-    .then(data => {
-      const regionInfo = `${data.country}, ${data.regionName}, ${data.city}`;
-      document.getElementById('region-text').innerText = regionInfo;
-    })
-    .catch(() => {
-      document.getElementById('region-text').innerText = 'Location unavailable';
-    });
+  // fetch('http://ip-api.com/json/')
+  //   .then(res => res.json())
+  //   .then(data => {
+  //     const regionInfo = `${data.country}, ${data.regionName}, ${data.city}`;
+  //     document.getElementById('region-text').innerText = regionInfo;
+  //   })
+  //   .catch(() => {
+  //     document.getElementById('region-text').innerText = 'Location unavailable';
+  //   });
 
   // 多语言切换
   function toggleLanguage() {
@@ -179,14 +179,14 @@
   }
 
     // 获取用户公网 IP 地址
-  // fetch('https://api.ipify.org?format=json')
-  //   .then(response => response.json())
-  //   .then(data => {
-  //     document.getElementById('ip-value').innerText = data.ip;
-  //   })
-  //   .catch(() => {
-  //     document.getElementById('ip-value').innerText = 'Unavailable';
-  //   });
+  fetch('https://api.ipify.org?format=json')
+    .then(response => response.json())
+    .then(data => {
+      document.getElementById('ip-value').innerText = data.ip;
+    })
+    .catch(() => {
+      document.getElementById('ip-value').innerText = 'Unavailable';
+    });
   </script>
 </body>
 </html>
