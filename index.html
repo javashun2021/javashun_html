@@ -56,9 +56,9 @@
     <div id="ip-display" style="text-align: center; font-size: 2rem; margin-bottom: 2rem;">
       IP: <span id="ip-value">Loading...</span>
     </div>
-    <div id="region-display" style="text-align: center; font-size: 1.8rem; margin-bottom: 2rem;">
+    <!-- <div id="region-display" style="text-align: center; font-size: 1.8rem; margin-bottom: 2rem;">
   📍  <span id="region-text">Loading location...</span>
-    </div>
+    </div> -->
     <div class="language-toggle" onclick="toggleLanguage()">🌐 <span id="lang-code">EN</span>
     </div>
   
@@ -179,14 +179,14 @@
   }
 
     // 获取用户公网 IP 地址
-  fetch('https://api.ipify.org?format=json')
-    .then(response => response.json())
-    .then(data => {
-      document.getElementById('ip-value').innerText = data.ip;
-    })
-    .catch(() => {
-      document.getElementById('ip-value').innerText = 'Unavailable';
-    });
+  // fetch('https://api.ipify.org?format=json')
+  //   .then(response => response.json())
+  //   .then(data => {
+  //     document.getElementById('ip-value').innerText = data.ip;
+  //   })
+  //   .catch(() => {
+  //     document.getElementById('ip-value').innerText = 'Unavailable';
+  //   });
   </script>
 </body>
 </html>
