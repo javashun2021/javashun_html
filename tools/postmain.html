@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Postmain 请求工具</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    input, select, textarea, button { margin: 5px 0; padding: 8px; }
+    #response { white-space: pre-wrap; background: #f5f5f5; padding: 10px; border: 1px solid #ccc; }
+    .method-btn {
+      padding: 6px 12px;
+      margin: 2px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: #eee;
+      cursor: pointer;
+    }
+    .method-btn.active {
+      background: #4CAF50;
+      color: white;
+      border-color: #388E3C;
+    }
+    .history-item {
+      padding: 5px;
+      border-bottom: 1px solid #ddd;
+      cursor: pointer;
+    }
+    .history-item:hover { background: #f0f0f0; }
+  </style>
+</head>
+<body>
+  <h2>Postmain 请求工具</h2>
+
+  <label>请求地址：</label><br>
+  <input type="text" id="url" placeholder="请输入请求地址" style="width: 80%;"><br>
+
+  <label>请求方式：</label><br>
+  <div id="methodSelector">
+    <button class="method-btn" data-method="GET">GET</button>
+    <button class="method-btn" data-method="POST">POST</button>
+    <button class="method-btn" data-method="PUT">PUT</button>
+    <button class="method-btn" data-method="DELETE">DELETE</button>
+    <button class="method-btn" data-method="PATCH">PATCH</button>
+  </div>
+  <input type="hidden" id="method" value="GET">
+
+  <h3>请求头</h3>
+  <div id="headers"></div>
+  <button onclick="addHeader()">添加请求头</button>
+
+  <h3>请求体</h3>
+  <label><input type="radio" name="bodyType" value="raw" checked> raw</label>
+  <label><input type="radio" name="bodyType" value="form"> x-www-form-urlencoded</label><br>
+  <textarea id="rawBody" placeholder="raw body (JSON/XML...)" style="width: 80%; height: 100px;"></textarea>
+  <div id="formBody" style="display:none;"></div>
+  <button onclick="addFormParam()">添加表单参数</button>
+
+  <br><br>
+  <button onclick="sendRequest()">发送请求</button>
+
+  <h3>响应结果</h3>
+  <div id="response"></div>
+
+  <h3>历史请求</h3>
+  <div id="history"></div>
+
+  <script>
+    // --- 请求方式选择 ---
+    const methodButtons = document.querySelectorAll(".method-btn");
+    methodButtons.forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.getElementById("method").value = btn.dataset.method;
+        methodButtons.forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+      });
+    });
+    // 默认选中 GET
+    methodButtons[0].classList.add("active");
+
+    // --- 请求头处理 ---
+    function addHeader(key="", value="") {
+      const div = document.createElement("div");
+      div.innerHTML = `<input placeholder="Key" value="${key}"> : 
+                       <input placeholder="Value" value="${value}">
+                       <button onclick="this.parentNode.remove()">删除</button>`;
+      document.getElementById("headers").appendChild(div);
+    }
+
+    function collectHeaders() {
+      const headers = {};
+      document.querySelectorAll("#headers div").forEach(div => {
+        const inputs = div.querySelectorAll("input");
+        if (inputs[0].value.trim()) {
+          headers[inputs[0].value.trim()] = inputs[1].value.trim();
+        }
+      });
+      return headers;
+    }
+
+    // --- 表单参数处理 ---
+    function addFormParam(key="", value="") {
+      const div = document.createElement("div");
+      div.className = "form-param-row";
+      div.innerHTML = `<input class="form-key" placeholder="Key" value="${key}"> = 
+                       <input class="form-value" placeholder="Value" value="${value}">
+                       <button onclick="this.parentNode.remove()">删除</button>`;
+      document.getElementById("formBody").appendChild(div);
+    }
+
+    document.querySelectorAll('input[name="bodyType"]').forEach(r => {
+      r.addEventListener("change", () => {
+        document.getElementById("rawBody").style.display = r.value === "raw" ? "block" : "none";
+        document.getElementById("formBody").style.display = r.value === "form" ? "block" : "none";
+      });
+    });
+
+    // --- 发送请求 ---
+    async function sendRequest() {
+      const url = document.getElementById("url").value.trim();
+      const method = document.getElementById("method").value;
+      const headers = collectHeaders();
+      const bodyType = document.querySelector('input[name="bodyType"]:checked').value;
+
+      let body = null;
+      if (["POST","PUT","PATCH","DELETE"].includes(method)) {
+        if (bodyType === "raw") {
+          body = document.getElementById("rawBody").value;
+        } else if (bodyType === "form") {
+          const formData = new URLSearchParams();
+          document.querySelectorAll(".form-param-row").forEach(row => {
+            const k = row.querySelector(".form-key").value.trim();
+            const v = row.querySelector(".form-value").value.trim();
+            if (k) formData.append(k, v);
+          });
+          body = formData.toString();
+          headers["Content-Type"] = "application/x-www-form-urlencoded";
+        }
+      }
+
+      try {
+        const res = await fetch("/api/proxy", {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({ url, method, headers, body })
+        });
+        const text = await res.text();
+        document.getElementById("response").textContent = text;
+        saveHistory({ url, method, headers, bodyType, body });
+      } catch (err) {
+        document.getElementById("response").textContent = "请求失败: " + err.message;
+      }
+    }
+
+    // --- 历史记录 ---
+    function saveHistory(entry) {
+      let history = JSON.parse(localStorage.getItem("history") || "[]");
+      history.unshift(entry);
+      if (history.length > 10) history.pop();
+      localStorage.setItem("history", JSON.stringify(history));
+      renderHistory();
+    }
+
+    function renderHistory() {
+      const history = JSON.parse(localStorage.getItem("history") || "[]");
+      const container = document.getElementById("history");
+      container.innerHTML = "";
+      history.forEach((h,i) => {
+        const div = document.createElement("div");
+        div.className = "history-item";
+        div.textContent = `${h.method} ${h.url}`;
+        div.onclick = () => loadHistory(i);
+        container.appendChild(div);
+      });
+    }
+
+    function loadHistory(i) {
+      const history = JSON.parse(localStorage.getItem("history") || "[]");
+      const h = history[i];
+      document.getElementById("url").value = h.url;
+      document.getElementById("method").value = h.method;
+      methodButtons.forEach(b => b.classList.remove("active"));
+      document.querySelector(`.method-btn[data-method="${h.method}"]`).classList.add("active");
+
+      document.getElementById("headers").innerHTML = "";
+      for (const k in h.headers) addHeader(k, h.headers[k]);
+
+      if (h.bodyType === "raw") {
+        document.querySelector('input[value="raw"]').checked = true;
+        document.getElementById("rawBody").style.display = "block";
+        document.getElementById("formBody").style.display = "none";
+        document.getElementById("rawBody").value = h.body || "";
+      } else {
+        document.querySelector('input[value="form"]').checked = true;
+        document.getElementById("rawBody").style.display = "none";
+        document.getElementById("formBody").style.display = "block";
+      }
+    }
+
+    renderHistory();
+  </script>
+</body>
+</html>

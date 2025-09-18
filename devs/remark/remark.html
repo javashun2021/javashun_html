@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>备忘录列表</title>
+  <style>
+    :root{--bg:#f4f7fb;--card:#ffffff;--accent:#2563eb;--muted:#6b7280}
+    html,body{height:100%;margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial; background:var(--bg)}
+    .page{padding:20px;max-width:720px;margin:auto}
+    h1{font-size:22px;margin-bottom:16px}
+    .memo-list{display:grid;gap:12px}
+    .memo{background:var(--card);padding:14px 16px;border-radius:12px;box-shadow:0 2px 6px rgba(0,0,0,.06)}
+    .memo h3{margin:0 0 6px;font-size:18px;color:#111827}
+    .memo p{margin:0;font-size:14px;color:#374151}
+    .note{font-size:13px;color:var(--muted)}
+    .loading{color:var(--muted);margin-top:12px}
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>📒 我的备忘录</h1>
+    <div id="memoList" class="memo-list"></div>
+    <div id="loading" class="loading">加载中...</div>
+  </div>
+
+  <!-- 引入上一个文件中的弹窗代码 -->
+  <div id="loginModalContainer"></div>
+
+  <script>
+    // === 登录状态模拟 ===
+    let token = localStorage.getItem('token');
+
+    function isLoggedIn(){ 
+      //check token
+      fetch('/api/login/check', {method:'POST', body: JSON.stringify({
+        token: token
+      })}).then(res=>res.json()).then(data=>{
+        if(data.code===0){
+          return true;
+        } else {
+          token = null;
+          localStorage.removeItem('token');
+          return false;
+        }
+      }).catch(err=>{
+        setError(document.getElementById('loginError'), '网络错误，请稍后重试');
+        refreshCaptcha();
+      });
+    }
+    function requireLogin(){
+      if(!isLoggedIn()){
+        showLoginModal();
+        return false;
+      }
+      return true;
+    }
+
+    // === 弹窗注入 ===
+    function showLoginModal(){
+      if(document.getElementById('overlay')){
+        document.getElementById('overlay').style.display='flex';
+        return;
+      }
+      fetch('login-register-popup.html') // 直接加载之前写的静态文件
+        .then(res=>res.text())
+        .then(html=>{
+          document.getElementById('loginModalContainer').innerHTML = html;
+          // 重新执行里面的 <script>
+          const scripts = document.getElementById('loginModalContainer').querySelectorAll('script');
+          scripts.forEach(oldScript=>{
+            const newScript = document.createElement('script');
+            newScript.text = oldScript.text;
+            document.body.appendChild(newScript);
+          });
+        });
+    }
+
+    function loadMemos() {
+      if (!requireLogin()) return;
+      document.getElementById('loading').style.display = 'block';
+      
+      fetch('/api/memo/list', {
+        method: 'GET',
+        headers: { 'Authorization': `${token}` }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.code === 0) {
+          renderMemos(data.data);
+        } else {
+          setError(document.getElementById('loginError'), '登录状态已过期，请重新登录');
+        }
+      })
+      .catch(err => {
+        setError(document.getElementById('loginError'), '网络错误，请稍后重试');
+      });
+    }
+
+
+    function renderMemos(list){
+      const box=document.getElementById('memoList');
+      box.innerHTML='';
+      list.forEach(m=>{
+        const item=document.createElement('div');
+        item.className='memo';
+        item.innerHTML=`<h3>${m.title}</h3><p>${m.content}</p>`;
+        box.appendChild(item);
+      });
+      document.getElementById('loading').style.display='none';
+    }
+
+    // === 页面加载 ===
+    window.addEventListener('load',()=>{
+      if(isLoggedIn()) loadMemos();
+      else showLoginModal();
+    });
+  </script>
+</body>
+</html>

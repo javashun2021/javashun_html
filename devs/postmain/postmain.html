@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>请求调试工具</title>
+  <style>
+    :root{--bg:#f4f7fb;--card:#ffffff;--accent:#2563eb;--muted:#6b7280}
+    body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto; background:var(--bg)}
+    .page{max-width:900px;margin:auto;padding:20px}
+    h1{font-size:22px;margin-bottom:16px}
+
+    .card{background:var(--card);border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);padding:16px;margin-bottom:18px}
+    .row{display:flex;gap:8px;align-items:center;margin-bottom:10px}
+    label{min-width:80px;font-size:14px;color:#374151}
+    select,input,textarea{flex:1;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px}
+    textarea{resize:vertical;min-height:80px}
+    button{padding:8px 14px;border:none;border-radius:8px;cursor:pointer}
+    .primary{background:var(--accent);color:#fff}
+    .secondary{background:#e5e7eb;color:#111827}
+
+    .history{margin-top:12px}
+    .history h3{margin:0 0 8px;font-size:16px}
+    .history-item{background:#f9fafb;padding:10px;border-radius:8px;margin-bottom:8px;font-size:13px;word-break:break-all}
+
+    pre{white-space:pre-wrap;word-wrap:break-word;background:#f9fafb;padding:12px;border-radius:8px;font-size:13px;overflow:auto;max-height:300px}
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>🌐 请求调试工具</h1>
+
+    <div class="card">
+      <div class="row">
+        <label for="method">方法</label>
+        <select id="method">
+          <option>GET</option>
+          <option>POST</option>
+          <option>PUT</option>
+          <option>DELETE</option>
+        </select>
+      </div>
+      <div class="row">
+        <label for="url">URL</label>
+        <input id="url" type="text" placeholder="https://api.example.com/path" />
+      </div>
+      <div class="row">
+        <label for="headers">请求头</label>
+        <textarea id="headers" placeholder='{"Authorization":"Bearer ..."}'></textarea>
+      </div>
+      <div class="row">
+        <label for="body">请求体</label>
+        <textarea id="body" placeholder='{"key":"value"}'></textarea>
+      </div>
+      <div class="row" style="justify-content:flex-end;gap:12px">
+        <button class="secondary" id="loginBtn">登入/注册</button>
+        <button class="primary" id="sendBtn">发送请求</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>响应结果</h3>
+      <pre id="response">等待请求...</pre>
+    </div>
+
+    <div class="card history">
+      <h3>历史记录</h3>
+      <div id="historyList"></div>
+    </div>
+  </div>
+
+  <div id="loginModalContainer"></div>
+
+  <script>
+    let token = localStorage.getItem('token');
+    let deviceId = localStorage.getItem('deviceId');
+    if(!deviceId){
+      deviceId = 'dev-' + Math.random().toString(36).substring(2,10);
+      localStorage.setItem('deviceId',deviceId);
+    }
+
+    const sendBtn=document.getElementById('sendBtn');
+    const responseBox=document.getElementById('response');
+    const historyList=document.getElementById('historyList');
+    const loginBtn=document.getElementById('loginBtn');
+
+    function getHistory(){
+      if(token){
+        // 模拟会员历史，真实情况应从后端获取
+        return JSON.parse(localStorage.getItem('memberHistory')||'[]');
+      }else{
+        return JSON.parse(localStorage.getItem('history_'+deviceId)||'[]');
+      }
+    }
+
+    function saveHistory(entry){
+      let list=getHistory();
+      list.unshift(entry);
+      if(list.length>20) list=list.slice(0,20);
+      if(token){
+        localStorage.setItem('memberHistory',JSON.stringify(list));
+      }else{
+        localStorage.setItem('history_'+deviceId,JSON.stringify(list));
+      }
+    }
+
+    function renderHistory(){
+      let list=getHistory();
+      historyList.innerHTML='';
+      list.forEach(h=>{
+        const div=document.createElement('div');
+        div.className='history-item';
+        div.textContent=`[${h.method}] ${h.url}`;
+        historyList.appendChild(div);
+      });
+    }
+
+    sendBtn.addEventListener('click',()=>{
+      const method=document.getElementById('method').value;
+      const url=document.getElementById('url').value.trim();
+      let headers={};
+      try{ headers=JSON.parse(document.getElementById('headers').value||'{}'); }catch(e){ alert('请求头必须为JSON'); return; }
+      let body=document.getElementById('body').value;
+
+      fetch(url,{
+        method,
+        headers,
+        body: method==='GET'?null:body
+      }).then(r=>r.text()).then(txt=>{
+        responseBox.textContent=txt;
+        saveHistory({method,url,ts:Date.now()});
+        renderHistory();
+      }).catch(err=>{
+        responseBox.textContent='请求失败: '+err;
+      });
+    });
+
+    loginBtn.addEventListener('click',()=>{
+      showLoginModal();
+    });
+
+    function showLoginModal(){
+      if(document.getElementById('overlay')){
+        document.getElementById('overlay').style.display='flex';
+        return;
+      }
+      fetch('login-register-popup.html')
+        .then(res=>res.text())
+        .then(html=>{
+          document.getElementById('loginModalContainer').innerHTML = html;
+          const scripts=document.getElementById('loginModalContainer').querySelectorAll('script');
+          scripts.forEach(oldScript=>{
+            const newScript=document.createElement('script');
+            newScript.text=oldScript.text;
+            document.body.appendChild(newScript);
+          });
+        });
+    }
+
+    // 初始化
+    renderHistory();
+  </script>
+</body>
+</html>

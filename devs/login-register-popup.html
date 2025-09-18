@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>登录 / 注册</title>
+  <style>
+    :root{--bg:#f4f7fb;--card:#ffffff;--accent:#2563eb;--muted:#6b7280}
+    html,body{height:100%;margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial; background:var(--bg)}
+    .page{height:100%;display:flex;align-items:center;justify-content:center}
+    .open-btn{padding:10px 16px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer}
+
+    /* 弹窗遮罩 & 卡片 */
+    .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:20px}
+    .modal{width:100%;max-width:420px;background:var(--card);border-radius:12px;box-shadow:0 10px 30px rgba(2,6,23,.2);overflow:hidden}
+    .modal-header{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid #eef2ff}
+    .modal-header h3{margin:0;font-size:18px}
+    .close-btn{background:transparent;border:none;font-size:18px;cursor:pointer}
+    .modal-body{padding:18px}
+
+    .tabs{display:flex;gap:8px;margin-bottom:12px}
+    .tab{flex:1;padding:8px 10px;text-align:center;border-radius:8px;cursor:pointer;border:1px solid transparent}
+    .tab.active{background:linear-gradient(90deg,#eef2ff,#ffffff);border-color:#e0e7ff}
+
+    form{display:grid;gap:10px}
+    label{font-size:13px;color:var(--muted)}
+    input[type="text"],input[type="password"]{width:100%;padding:10px;border-radius:8px;border:1px solid #e6eef8;background:#fafcff}
+
+    .row{display:flex;gap:8px;align-items:center}
+    .captcha-box{display:flex;gap:8px;align-items:center}
+    .captcha-canvas{border-radius:6px;border:1px solid #e6eef8}
+    .small{font-size:12px;color:var(--muted)}
+
+    .actions{display:flex;justify-content:space-between;align-items:center;margin-top:6px}
+    .primary{padding:10px 12px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer}
+    .link-btn{background:transparent;border:none;color:var(--accent);cursor:pointer}
+
+    .error{color:#b91c1c;font-size:13px}
+    .note{font-size:12px;color:var(--muted);margin-top:6px}
+
+    @media (max-width:480px){.modal{max-width:95%}}
+  </style>
+</head>
+<body>
+  <div class="page">
+    <button class="open-btn" id="openModalBtn">打开 登录 / 注册 弹窗</button>
+  </div>
+
+  <div class="overlay" id="overlay" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-header">
+        <h3 id="modalTitle">登入</h3>
+        <button class="close-btn" id="closeModalBtn" aria-label="关闭">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="tabs" role="tablist">
+          <div class="tab active" id="tab-login" role="tab" tabindex="0">登入</div>
+          <div class="tab" id="tab-register" role="tab" tabindex="0">注册</div>
+        </div>
+
+        <!-- 登录表单 -->
+        <form id="loginForm">
+          <div>
+            <label for="loginAccount">账号</label>
+            <input id="loginAccount" name="account" type="text" placeholder="邮箱或手机号" required />
+          </div>
+          <div>
+            <label for="loginPassword">密码</label>
+            <input id="loginPassword" name="password" type="password" placeholder="请输入密码" required />
+          </div>
+          <div>
+            <label class="small">验证码</label>
+            <div class="row captcha-box">
+              <input id="loginCaptchaInput" name="captcha" type="text" placeholder="输入图中验证码" style="flex:1" required />
+              <canvas id="loginCaptcha" class="captcha-canvas" width="100" height="38" title="点击刷新验证码" style="cursor:pointer"></canvas>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button type="submit" class="primary">登入</button>
+            <button type="button" class="link-btn" id="toRegisterBtn">没有账号？去注册</button>
+          </div>
+          <div id="loginError" class="error" aria-live="polite"></div>
+        </form>
+
+        <!-- 注册表单（默认隐藏） -->
+        <form id="registerForm" style="display:none">
+          <div>
+            <label for="regUsername">用户名</label>
+            <input id="regUsername" name="username" type="text" placeholder="用户名（英文/数字/下划线）" required />
+          </div>
+          <div>
+            <label for="regPassword">密码</label>
+            <input id="regPassword" name="password" type="password" placeholder="请输入密码（至少6位）" required />
+          </div>
+          <div>
+            <label for="regConfirm">确认密码</label>
+            <input id="regConfirm" name="confirm" type="password" placeholder="再次输入密码" required />
+          </div>
+          <div class="actions">
+            <button type="submit" class="primary">注册</button>
+            <button type="button" class="link-btn" id="toLoginBtn">已有账号？去登入</button>
+          </div>
+          <div id="regError" class="error" aria-live="polite"></div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 元素引用
+    const overlay = document.getElementById('overlay');
+    const openBtn = document.getElementById('openModalBtn');
+    const closeBtn = document.getElementById('closeModalBtn');
+    const tabLogin = document.getElementById('tab-login');
+    const tabRegister = document.getElementById('tab-register');
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    const toRegisterBtn = document.getElementById('toRegisterBtn');
+    const toLoginBtn = document.getElementById('toLoginBtn');
+
+    // 打开/关闭弹窗
+    openBtn.addEventListener('click', ()=>{ overlay.style.display='flex'; document.body.style.overflow='hidden'; document.getElementById('loginAccount').focus(); refreshCaptcha(); });
+    closeBtn.addEventListener('click', closeModal);
+    overlay.addEventListener('click', (e)=>{ if(e.target===overlay) closeModal(); });
+    function closeModal(){ overlay.style.display='none'; document.body.style.overflow='auto'; }
+
+    // 切换标签
+    function showLogin(){ document.getElementById('modalTitle').textContent='登入'; tabLogin.classList.add('active'); tabRegister.classList.remove('active'); loginForm.style.display='grid'; registerForm.style.display='none'; refreshCaptcha(); }
+    function showRegister(){ document.getElementById('modalTitle').textContent='注册'; tabRegister.classList.add('active'); tabLogin.classList.remove('active'); registerForm.style.display='grid'; loginForm.style.display='none'; }
+    tabLogin.addEventListener('click', showLogin); tabRegister.addEventListener('click', showRegister);
+    toRegisterBtn.addEventListener('click', showRegister); toLoginBtn.addEventListener('click', showLogin);
+
+    // 简单的客户端验证和示例提交逻辑
+    function setError(el, msg){ if(el) el.textContent = msg; }
+
+    // 伪验证码：canvas 随机绘制 4 位字母数字
+    const loginCaptchaCanvas = document.getElementById('loginCaptcha');
+    let currentCaptcha = '';
+    function randChar(){ const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; return chars.charAt(Math.floor(Math.random()*chars.length)); }
+    function refreshCaptcha(){ const ctx = loginCaptchaCanvas.getContext('2d'); ctx.clearRect(0,0,loginCaptchaCanvas.width, loginCaptchaCanvas.height); ctx.fillStyle = '#f6f9ff'; ctx.fillRect(0,0,loginCaptchaCanvas.width, loginCaptchaCanvas.height);
+      currentCaptcha = '';
+      for(let i=0;i<4;i++){ currentCaptcha += randChar(); }
+      // 背景干扰线
+      for(let i=0;i<6;i++){ ctx.beginPath(); ctx.moveTo(Math.random()*loginCaptchaCanvas.width, Math.random()*loginCaptchaCanvas.height); ctx.lineTo(Math.random()*loginCaptchaCanvas.width, Math.random()*loginCaptchaCanvas.height); ctx.strokeStyle = 'rgba(0,0,0,0.08)'; ctx.stroke(); }
+      // 绘制验证码
+      ctx.font = '20px Arial';
+      for(let i=0;i<currentCaptcha.length;i++){
+        ctx.save();
+        const x = 12 + i*22 + (Math.random()*6-3);
+        const y = 24 + (Math.random()*6-3);
+        ctx.translate(x,y);
+        ctx.rotate((Math.random()-0.5)*0.4);
+        ctx.fillStyle = '#111827';
+        ctx.fillText(currentCaptcha[i], 0, 0);
+        ctx.restore();
+      }
+    }
+    loginCaptchaCanvas.addEventListener('click', refreshCaptcha);
+
+    // 登录提交
+    loginForm.addEventListener('submit', (e)=>{
+      e.preventDefault();
+      setError(document.getElementById('loginError'), '');
+      const account = document.getElementById('loginAccount').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      const captcha = document.getElementById('loginCaptchaInput').value.trim().toUpperCase();
+      if(!account){ setError(document.getElementById('loginError'),'请输入账号'); return; }
+      if(password.length<6){ setError(document.getElementById('loginError'),'密码至少6位'); return; }
+      if(captcha!==currentCaptcha){ setError(document.getElementById('loginError'),'验证码不正确，请重试'); refreshCaptcha(); return; }
+
+      fetch('/api/login/in', {method:'POST', body: JSON.stringify({
+        user:account,pwd:password
+      })}).then(res=>res.json()).then(data=>{
+        if(data.code===0){
+          localStorage.setItem('token', data.token || 'demo-token');
+          closeModal();
+        } else {
+          setError(document.getElementById('loginError'), data.msg || '登录失败，请重试');
+          refreshCaptcha();
+        }
+      }).catch(err=>{
+        setError(document.getElementById('loginError'), '网络错误，请稍后重试');
+        refreshCaptcha();
+      });
+      closeModal();
+    });
+
+    // 注册提交
+    registerForm.addEventListener('submit', (e)=>{
+      e.preventDefault();
+      setError(document.getElementById('regError'), '');
+      const username = document.getElementById('regUsername').value.trim();
+      const pwd = document.getElementById('regPassword').value;
+      const conf = document.getElementById('regConfirm').value;
+      const usernameRe = /^\w{3,20}$/;
+      if(!usernameRe.test(username)){ setError(document.getElementById('regError'),'用户名需为3-20位字母数字下划线'); return; }
+      if(pwd.length<6){ setError(document.getElementById('regError'),'密码至少6位'); return; }
+      if(pwd!==conf){ setError(document.getElementById('regError'),'两次密码不一致'); return; }
+
+      fetch('/api/login/register', {method:'POST', body: JSON.stringify({
+        username:username,password:pwd
+      })}).then(res=>res.json()).then(data=>{
+        if(data.code===0){
+          alert('注册成功，请登录');
+          showLogin();
+        } else {
+          setError(document.getElementById('regError'), data.msg || '注册失败，请重试');
+        }
+      }).catch(err=>{
+        setError(document.getElementById('regError'), '网络错误，请稍后重试');
+      });
+  
+      showLogin();
+    });
+
+    // 初始化
+    refreshCaptcha();
+
+    // 键盘无障碍：Esc 关闭
+    document.addEventListener('keydown', (e)=>{ if(e.key==='Escape' && overlay.style.display==='flex') closeModal(); });
+  </script>
+</body>
+</html>
