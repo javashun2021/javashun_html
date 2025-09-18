@@ -1,230 +1,134 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>PostMain 风格请求页面（Proxy）</title>
+  <meta charset="UTF-8">
+  <title>Postmain Proxy 请求工具</title>
   <style>
-    :root{--bg:#0f1724;--card:#0b1220;--muted:#9aa4b2;--accent:#0ea5a4;--glass:rgba(255,255,255,0.03)}
-    *{box-sizing:border-box}
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial; margin:0; background:linear-gradient(180deg,#071122 0%, #0b1320 100%); color:#e6eef6;}
-    .app{max-width:1100px;margin:20px auto;padding:18px;display:grid;grid-template-columns:320px 1fr;gap:16px}
-    .panel{background:var(--card);padding:14px;border-radius:10px;box-shadow:0 6px 18px rgba(2,6,23,0.6)}
-    h1{font-size:18px;margin:0 0 12px}
-    label{display:block;font-size:12px;color:var(--muted);margin:8px 0 6px}
-    input[type=text], textarea, select{width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.06);background:var(--glass);color:inherit}
-    textarea{min-height:90px;resize:vertical;font-family:monospace}
-    .btn{display:inline-block;padding:8px 12px;border-radius:8px;background:linear-gradient(90deg,var(--accent),#06b6d4);color:#061219;font-weight:600;border:none;cursor:pointer}
-    .muted{color:var(--muted);font-size:13px}
-    .history-list{max-height:78vh;overflow:auto;padding-right:6px}
-    .history-item{padding:8px;border-radius:8px;margin-bottom:8px;background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);cursor:pointer}
-    .history-item small{display:block;color:var(--muted);font-size:12px}
-    .row{display:flex;gap:8px;align-items:center}
-    .flex{display:flex;gap:8px}
-    .response{white-space:pre-wrap;font-family:monospace;background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);padding:12px;border-radius:8px;max-height:40vh;overflow:auto}
-    @media(max-width:900px){.app{grid-template-columns:1fr;padding:12px} .history-list{max-height:160px}} 
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    textarea, input, select { width: 100%; margin: 5px 0; padding: 5px; }
+    button { margin: 5px 0; padding: 6px 12px; }
+    .history { border: 1px solid #ccc; padding: 10px; max-height: 200px; overflow-y: auto; }
+    .history-item { cursor: pointer; padding: 5px; border-bottom: 1px solid #eee; }
+    .history-item:hover { background: #f0f0f0; }
+    pre { background: #f8f8f8; padding: 10px; border: 1px solid #ddd; overflow-x: auto; }
   </style>
 </head>
 <body>
-  <div class="app">
-    <!-- 左侧：历史列表 + 设备ID -->
-    <div class="panel">
-      <h1>历史请求（基于 deviceId）</h1>
-      <label>设备唯一 ID（deviceId）</label>
-      <div class="row">
-        <input id="deviceId" type="text" placeholder="请输入或生成 deviceId" />
-        <button id="genId" class="btn">生成</button>
-      </div>
-      <p class="muted">页面会把 deviceId 存到 localStorage，下次自动带出；页面会用 deviceId 向后端请求历史列表。</p>
+  <h2>Postmain Proxy 请求工具</h2>
 
-      <hr style="margin:10px 0;border:0;border-top:1px solid rgba(255,255,255,0.03)" />
+  <label>设备唯一ID:</label>
+  <input type="text" id="deviceId" placeholder="输入或生成设备ID">
+  <button onclick="generateDeviceId()">生成随机ID</button>
 
-      <div class="history-list" id="historyList">
-        <p class="muted">正在等待历史数据...</p>
-      </div>
-    </div>
+  <label>请求 URL:</label>
+  <input type="text" id="url" placeholder="https://example.com/api">
 
-    <!-- 右侧：请求面板 + 响应 -->
-    <div class="panel">
-      <h1>请求构建器（发送到 /pay/api/postmain/proxy）</h1>
+  <label>请求方法:</label>
+  <select id="method">
+    <option value="GET">GET</option>
+    <option value="POST">POST</option>
+    <option value="PUT">PUT</option>
+    <option value="DELETE">DELETE</option>
+  </select>
 
-      <label>请求 URL</label>
-      <input id="reqUrl" type="text" placeholder="https://api.example.com/endpoint" />
+  <label>请求头 (JSON 格式):</label>
+  <textarea id="headers" rows="4">{}</textarea>
 
-      <label>方法</label>
-      <select id="reqMethod">
-        <option>GET</option>
-        <option>POST</option>
-        <option>PUT</option>
-        <option>DELETE</option>
-        <option>PATCH</option>
-      </select>
+  <label>请求体 (JSON 格式):</label>
+  <textarea id="body" rows="4">{}</textarea>
 
-      <label>请求头（JSON 格式，例如 {"Content-Type":"application/json"}）</label>
-      <textarea id="reqHeaders" placeholder='{"Content-Type":"application/json"}'></textarea>
+  <button onclick="sendRequest()">发送请求</button>
 
-      <label>请求体（对于 GET 通常留空）</label>
-      <textarea id="reqBody" placeholder='{"foo":"bar"}'></textarea>
+  <h3>响应结果</h3>
+  <pre id="response"></pre>
 
-      <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
-        <button id="sendBtn" class="btn">发送请求</button>
-        <button id="clearBtn" class="btn" style="background:transparent;color:var(--accent);border:1px solid rgba(255,255,255,0.06)">清空</button>
-        <div style="margin-left:auto" class="muted">注意：页面将把当前请求发送到 <code>/pay/api/postmain/proxy</code></div>
-      </div>
+  <h3>历史请求</h3>
+  <div class="history" id="history"></div>
 
-      <hr style="margin:12px 0;border:0;border-top:1px solid rgba(255,255,255,0.03)" />
+<script>
+  const deviceIdInput = document.getElementById('deviceId');
+  const urlInput = document.getElementById('url');
+  const methodSelect = document.getElementById('method');
+  const headersInput = document.getElementById('headers');
+  const bodyInput = document.getElementById('body');
+  const responseBox = document.getElementById('response');
+  const historyBox = document.getElementById('history');
 
-      <h2 style="font-size:14px;margin:6px 0">服务器返回 / 调试输出</h2>
-      <div id="response" class="response">等待发送请求...</div>
-    </div>
-  </div>
+  // 初始化设备ID
+  window.onload = () => {
+    const savedId = localStorage.getItem('deviceId');
+    if (savedId) deviceIdInput.value = savedId;
+    else generateDeviceId();
+    loadHistory();
+  };
 
-  <script>
-    // ------- 配置项 -------
-    const PROXY_BASE = '/pay/api/postmain/proxy'; // 后端通用代理接口
-    // 页面启动后会：1) 从 localStorage 读 deviceId 2) 请求历史（GET ?action=history&deviceId=...）
+  function generateDeviceId() {
+      const info = [
+      navigator.userAgent,
+      navigator.language,
+      screen.width,
+      screen.height,
+      screen.colorDepth,
+      Intl.DateTimeFormat().resolvedOptions().timeZone
+    ].join("###");
 
-    const $ = id => document.getElementById(id);
-
-    function genDeviceId(){
-      // 简易 UUID v4 生成
-      return 'device-' + ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
-        (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
-      );
+    // 简单 hash
+    let hash = 0;
+    for (let i = 0; i < info.length; i++) {
+      hash = (hash << 5) - hash + info.charCodeAt(i);
+      hash |= 0;
     }
+    return "dev-" + Math.abs(hash);
+  }
 
-    function loadDeviceId(){
-      const saved = localStorage.getItem('postmain:deviceId');
-      if(saved){
-        $('deviceId').value = saved;
-      }
+  async function sendRequest() {
+    const payload = {
+      deviceId: deviceIdInput.value,
+      url: urlInput.value,
+      method: methodSelect.value,
+      headers: JSON.parse(headersInput.value || '{}'),
+      body: JSON.parse(bodyInput.value || '{}')
+    };
+
+    try {
+      const res = await fetch('/pay/api/postmain/proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const text = await res.text();
+      responseBox.textContent = text;
+      loadHistory();
+    } catch (err) {
+      responseBox.textContent = '请求错误: ' + err;
     }
+  }
 
-    function saveDeviceId(val){
-      if(val) localStorage.setItem('postmain:deviceId', val);
-    }
-
-    async function fetchHistory(deviceId){
-      const list = $('historyList');
-      list.innerHTML = '<p class="muted">加载中...</p>';
-      try{
-        const url = new URL(PROXY_BASE, location.origin);
-        url.searchParams.set('action','history');
-        url.searchParams.set('deviceId', deviceId || '');
-
-        const res = await fetch(url.toString(), { method: 'GET' });
-        if(!res.ok) throw new Error('历史接口返回 ' + res.status);
-        const data = await res.json();
-        renderHistory(data);
-      }catch(err){
-        list.innerHTML = '<p class="muted">读取历史失败：'+ err.message +'</p>';
-      }
-    }
-
-    function renderHistory(items){
-      const list = $('historyList');
-      if(!items || items.length === 0){
-        list.innerHTML = '<p class="muted">没有历史请求（后端未返回数据）</p>';
-        return;
-      }
-      list.innerHTML = '';
-      items.forEach(item => {
-        // item 结构约定：{id, url, method, headers (object), body, summary, timestamp}
+  async function loadHistory() {
+    const id = deviceIdInput.value;
+    if (!id) return;
+    try {
+      const res = await fetch(`/pay/api/postmain/proxy/history?deviceId=${id}`);
+      const history = await res.json();
+      historyBox.innerHTML = '';
+      history.forEach(item => {
         const div = document.createElement('div');
         div.className = 'history-item';
-        div.innerHTML = `
-          <strong>${escapeHtml(item.method||'GET')} ${escapeHtml(truncate(item.url||'', 60))}</strong>
-          <small>${item.timestamp ? new Date(item.timestamp).toLocaleString() : ''} ${item.summary ? '- ' + escapeHtml(item.summary) : ''}</small>
-        `;
-        div.addEventListener('click', () => fillFromHistory(item));
-        list.appendChild(div);
+        div.textContent = `${item.method} ${item.url} (${item.timestamp})`;
+        div.onclick = () => fillRequest(item);
+        historyBox.appendChild(div);
       });
+    } catch (err) {
+      historyBox.innerHTML = '<i>无法加载历史记录</i>';
     }
+  }
 
-    function truncate(str, n){return str&&str.length>n?str.slice(0,n-1)+'…':str}
-    function escapeHtml(s){if(!s) return ''; return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-
-    function fillFromHistory(item){
-      $('reqUrl').value = item.url || '';
-      $('reqMethod').value = item.method || 'GET';
-      $('reqHeaders').value = item.headers ? JSON.stringify(item.headers, null, 2) : '';
-      $('reqBody').value = item.body || '';
-      setResponse('已从历史填充请求（id: ' + (item.id || 'n/a') + '）');
-    }
-
-    function setResponse(text){ $('response').textContent = text; }
-
-    async function sendRequest(){
-      const deviceId = $('deviceId').value.trim();
-      if(!deviceId) return alert('请先填写 deviceId');
-
-      const payload = {
-        deviceId,
-        url: $('reqUrl').value.trim(),
-        method: $('reqMethod').value,
-        headers: safeParseJSON($('reqHeaders').value),
-        body: $('reqBody').value
-      };
-
-      if(!payload.url){ alert('请填写请求 URL'); return; }
-
-      setResponse('发送中...');
-
-      try{
-        const res = await fetch(PROXY_BASE, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-
-        const contentType = res.headers.get('Content-Type') || '';
-        let text;
-        if(contentType.includes('application/json')){
-          const json = await res.json();
-          text = JSON.stringify(json, null, 2);
-        } else {
-          text = await res.text();
-        }
-
-        setResponse('HTTP ' + res.status + '\n\n' + text);
-
-        // 发送成功后，尝试刷新历史列表
-        fetchHistory(deviceId);
-      }catch(err){
-        setResponse('请求失败：' + err.message);
-      }
-    }
-
-    function safeParseJSON(str){
-      if(!str) return {};
-      try{ return JSON.parse(str); }catch(e){ return {__raw: str}; }
-    }
-
-    // 绑定事件
-    document.addEventListener('DOMContentLoaded', () =>{
-      loadDeviceId();
-      const deviceId = $('deviceId').value || '';
-      if(deviceId) fetchHistory(deviceId);
-
-      $('genId').addEventListener('click', ()=>{
-        const id = genDeviceId();
-        $('deviceId').value = id;
-        saveDeviceId(id);
-        fetchHistory(id);
-      });
-
-      $('deviceId').addEventListener('change', e => { saveDeviceId(e.target.value); fetchHistory(e.target.value); });
-
-      $('sendBtn').addEventListener('click', async ()=>{
-        saveDeviceId($('deviceId').value.trim());
-        await sendRequest();
-      });
-
-      $('clearBtn').addEventListener('click', ()=>{
-        $('reqUrl').value='';$('reqHeaders').value='';$('reqBody').value='';setResponse('已清空请求');
-      });
-    });
-
-  </script>
+  function fillRequest(item) {
+    urlInput.value = item.url;
+    methodSelect.value = item.method;
+    headersInput.value = JSON.stringify(item.headers || {}, null, 2);
+    bodyInput.value = JSON.stringify(item.body || {}, null, 2);
+  }
+</script>
 </body>
 </html>
