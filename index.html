@@ -52,13 +52,13 @@
 </head>
 <body>
   <header>
-    <div><strong>api211.com</strong></div>
-    <div id="ip-display" style="text-align: center; font-size: 2rem; margin-bottom: 2rem;">
-      IP: <span id="ip-value">Loading...</span>
-    </div>
-    <!-- <div id="region-display" style="text-align: center; font-size: 1.8rem; margin-bottom: 2rem;">
-  📍  <span id="region-text">Loading location...</span>
-    </div> -->
+   <div style="text-align: center; margin-bottom: 1rem;">
+    <input type="text" id="domain-input" placeholder="输入域名 (例如 api211.com)" style="padding: 0.5rem; width: 250px; border-radius: 4px; border: 1px solid #ccc;">
+    <button onclick="resolveDomain()" style="padding: 0.5rem 1rem; margin-left: 0.5rem; border: none; background: #007bff; color: white; border-radius: 4px; cursor: pointer;">查询</button>
+  </div>
+  <div id="ip-display" style="text-align: center; font-size: 1.5rem; margin-bottom: 2rem;">
+    IP: <span id="ip-value">Loading...</span>
+  </div>
     <div class="language-toggle" onclick="toggleLanguage()">🌐 <span id="lang-code">EN</span>
     </div>
   
@@ -204,6 +204,31 @@
     .catch(() => {
       document.getElementById('ip-value').innerText = 'Unavailable';
     });
+
+    // 查询域名解析
+function resolveDomain() {
+  const domain = document.getElementById('domain-input').value.trim();
+  if (!domain) {
+    alert('请输入域名');
+    return;
+  }
+  document.getElementById('ip-value').innerText = '查询中...';
+
+  fetch(`https://dns.google/resolve?name=${domain}&type=A`)
+    .then(res => res.json())
+    .then(data => {
+      if (data.Answer && data.Answer.length > 0) {
+        // 只取第一个 A 记录
+        const ip = data.Answer.find(a => a.type === 1)?.data || '未找到 A 记录';
+        document.getElementById('ip-value').innerText = ip;
+      } else {
+        document.getElementById('ip-value').innerText = '未解析到 IP';
+      }
+    })
+    .catch(() => {
+      document.getElementById('ip-value').innerText = '查询失败';
+    });
+}
   </script>
 </body>
 </html>
