@@ -205,30 +205,34 @@
       document.getElementById('ip-value').innerText = 'Unavailable';
     });
 
-    // 查询域名解析
-function resolveDomain() {
-  const domain = document.getElementById('domain-input').value.trim();
-  if (!domain) {
-    alert('请输入域名');
-    return;
-  }
-  document.getElementById('ip-value').innerText = '查询中...';
+   function resolveDomain() {
+    const domain = document.getElementById('domain-input').value.trim();
+    if (!domain) {
+      alert('请输入域名');
+      return;
+    }
+    document.getElementById('ip-value').innerText = '查询中...';
 
-  fetch(`https://dns.google/resolve?name=${domain}&type=A`)
-    .then(res => res.json())
-    .then(data => {
-      if (data.Answer && data.Answer.length > 0) {
-        // 只取第一个 A 记录
-        const ip = data.Answer.find(a => a.type === 1)?.data || '未找到 A 记录';
-        document.getElementById('ip-value').innerText = ip;
-      } else {
-        document.getElementById('ip-value').innerText = '未解析到 IP';
-      }
-    })
-    .catch(() => {
-      document.getElementById('ip-value').innerText = '查询失败';
-    });
-}
+    fetch(`https://dns.google/resolve?name=${domain}&type=A`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.Answer && data.Answer.length > 0) {
+          // 过滤 A 记录（type=1），取所有 IP
+          const ips = data.Answer.filter(a => a.type === 1).map(a => a.data);
+          if (ips.length > 0) {
+            document.getElementById('ip-value').innerText = ips.join(', ');
+          } else {
+            document.getElementById('ip-value').innerText = '未找到 A 记录';
+          }
+        } else {
+          document.getElementById('ip-value').innerText = '未解析到 IP';
+        }
+      })
+      .catch(() => {
+        document.getElementById('ip-value').innerText = '查询失败';
+      });
+  }
+
   </script>
 </body>
 </html>
