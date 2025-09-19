@@ -157,7 +157,11 @@
           <div id="params"></div>
         </div>
         <button onclick="sendRequest()">调试</button>
-        <div class="result" id="result">响应结果将在这里显示</div>
+        <div class="result" id="resultArea">
+          <div id="statusButtons"></div>
+          <pre id="bodyResult"></pre>
+        </div>
+
       </div>
     </div>
   </div>
@@ -371,9 +375,7 @@ function collectInputs(container) {
     if (!currentApi) return alert("请先选择接口");
 
     const headersObj = collectInputs(document.getElementById("headers"));
-
     const paramsObj = collectInputs(document.getElementById("params"));
-
     const deviceId = generateDeviceId();
 
     const payload = {
@@ -391,9 +393,35 @@ function collectInputs(container) {
         body: JSON.stringify(payload)
       });
       let result = await res.json();
-      document.getElementById("result").textContent = JSON.stringify(result, null, 2);
+
+      const statusButtons = document.getElementById("statusButtons");
+      const bodyResult = document.getElementById("bodyResult");
+      statusButtons.innerHTML = "";
+      bodyResult.textContent = "";
+
+      if (result.code === 0 && result.data) {
+        const data = result.data;
+
+        // 显示 statusCode 和 statusCodeValue
+        ["statusCode", "statusCodeValue"].forEach(key => {
+          let btn = document.createElement("button");
+          btn.textContent = key + ": " + data[key];
+          btn.style.marginRight = "8px";
+          statusButtons.appendChild(btn);
+        });
+
+        // 解析 body
+        try {
+          let parsed = JSON.parse(data.body);
+          bodyResult.textContent = JSON.stringify(parsed, null, 2);
+        } catch {
+          bodyResult.textContent = data.body || "";
+        }
+      } else {
+        bodyResult.textContent = "错误: " + (result.msg || "未知错误");
+      }
     } catch (e) {
-      document.getElementById("result").textContent = "请求失败: " + e;
+      document.getElementById("resultArea").textContent = "请求失败: " + e;
     }
   }
 
