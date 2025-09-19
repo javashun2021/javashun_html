@@ -4,11 +4,114 @@
   <meta charset="UTF-8">
   <title>Postmain Proxy 请求工具</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 0; }
-    .container { display: flex; min-height: 100vh; }
-    .main { flex: 1; padding: 20px; }
-    textarea, input, select { width: 100%; margin: 5px 0; padding: 5px; }
-    button { margin: 5px 0; padding: 6px 12px; cursor: pointer; }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      background: #f4f6f9;
+    }
+
+    h2 {
+      margin: 0;
+      padding: 15px;
+      background: #2c3e50;
+      color: #fff;
+    }
+
+    .container {
+      display: flex;
+      min-height: calc(100vh - 50px);
+    }
+
+    /* 历史请求区 */
+    .history-panel {
+      width: 280px;
+      border-right: 2px solid #ddd;
+      background: #fff;
+      padding: 10px;
+      overflow-y: auto;
+    }
+
+    .history-item {
+      cursor: pointer;
+      padding: 8px;
+      border-bottom: 1px solid #eee;
+    }
+    .history-item:hover {
+      background: #f0f0f0;
+    }
+
+    /* 分页控件 */
+    /* 分页样式 —— 放在通用 button 规则之后 */
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 10px;
+      gap: 10px;
+      font-size: 14px;
+    }
+
+    .pagination button {
+      padding: 5px 12px;
+      border: 1px solid #007bff;
+      background: #fff;
+      color: #007bff;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background .15s, color .15s, border-color .15s;
+    }
+
+    /* 悬停（仅在非禁用时生效） */
+    .pagination button:hover:not(:disabled) {
+      background: #007bff;
+      color: #fff;
+    }
+
+    /* 禁用样式 —— 确保 selector 使用 class，不要用 #pagination */
+    .pagination button:disabled,
+    .pagination button[disabled] {
+      background: #f0f0f0;
+      color: #aaa;
+      border-color: #ccc;
+      cursor: not-allowed;
+      pointer-events: none; /* 防止点击事件仍触发 */
+      opacity: 0.9;
+    }
+
+    /* 可选：页码文本样式 */
+    #pageInfo {
+      color: #333;
+      font-weight: 600;
+      margin: 0 8px;
+    }
+
+
+    /* 请求区 */
+    .main-panel {
+      flex: 1;
+      padding: 20px;
+      background: #fff;
+      border-left: 2px solid #ddd;
+    }
+
+    textarea, input, select {
+      width: 100%;
+      margin: 5px 0;
+      padding: 6px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    button {
+      margin: 5px 0;
+      padding: 6px 12px;
+      cursor: pointer;
+      border: 1px solid #2c3e50;
+      background: #34495e;
+      color: #fff;
+      border-radius: 4px;
+    }
+
     button.loading {
       cursor: not-allowed;
       opacity: 0.7;
@@ -30,52 +133,64 @@
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
-    .history { border-right: 1px solid #ccc; padding: 10px; width: 280px; overflow-y: auto; }
-    .history-item { cursor: pointer; padding: 5px; border-bottom: 1px solid #eee; }
-    .history-item:hover { background: #f0f0f0; }
-    pre { background: #f8f8f8; padding: 10px; border: 1px solid #ddd; overflow-x: auto; }
 
-    /* 移动端隐藏侧边栏，改用抽屉 */
+    pre {
+      background: #f8f8f8;
+      padding: 10px;
+      border: 1px solid #ddd;
+      overflow-x: auto;
+    }
+
+    /* 手机端样式 */
     @media (max-width: 768px) {
-      .container { flex-direction: column; }
-      .history { 
-        position: fixed;
-        top: 0;
-        left: 0;
-        height: 100%;
-        background: #fff;
-        z-index: 1000;
-        width: 280px;
-        border-right: 1px solid #ccc;
-        transform: translateX(-100%);
-        transition: transform 0.3s ease;
+      .container {
+        flex-direction: column;
       }
-      .history.open { transform: translateX(0); }
-      .toggle-history-btn {
-        display: inline-block;
+      .history-panel {
+        display: none;
+        position: fixed;
+        top: 50px;
+        left: 0;
+        bottom: 0;
+        width: 250px;
+        background: #fff;
+        border-right: 2px solid #ddd;
+        z-index: 1000;
+        overflow-y: auto;
+      }
+      .history-panel.active {
+        display: block;
+      }
+      .toggle-history {
+        display: block;
         margin: 10px;
-        padding: 8px 12px;
-        background: #007bff;
-        color: white;
-        border: none;
-        border-radius: 4px;
       }
     }
     @media (min-width: 769px) {
-      .toggle-history-btn { display: none; }
+      .toggle-history {
+        display: none;
+      }
     }
   </style>
 </head>
 <body>
+  <h2>Postmain Proxy 请求工具</h2>
+  <button class="toggle-history" onclick="toggleHistory()">📜 查看历史请求</button>
+
   <div class="container">
-    <!-- 历史请求（PC端左侧，移动端抽屉） -->
-    <div class="history" id="history"></div>
+    <!-- 历史请求 -->
+    <div class="history-panel">
+      <div id="history"></div>
+      <!-- 分页控件 -->
+      <div class="pagination">
+        <button id="prevPage" disabled onclick="changePage(-1)">上一页</button>
+        <span id="pageInfo">第 1 / 1 页</span>
+        <button id="nextPage" onclick="changePage(1)">下一页</button>
+      </div>
+    </div>
 
-    <!-- 主体 -->
-    <div class="main">
-      <button class="toggle-history-btn" onclick="toggleHistory()">☰ 历史记录</button>
-      <h2>Postmain Proxy 请求工具</h2>
-
+    <!-- 请求工具 -->
+    <div class="main-panel">
       <label>设备唯一ID:</label>
       <input type="text" id="deviceId" placeholder="输入或生成设备ID">
       <button onclick="generateDeviceId()">生成随机ID</button>
@@ -123,6 +238,11 @@
   const historyBox = document.getElementById('history');
   const sendBtn = document.getElementById('sendBtn');
 
+  // 分页参数
+  let pageNum = 1;
+  const pageSize = 10;
+  let total = 0;
+
   // 初始化设备ID
   window.onload = () => {
     const savedId = localStorage.getItem('deviceId');
@@ -152,7 +272,6 @@
     return devId;
   }
 
-  // 解析请求头，支持 JSON 或 每行 `key: value`
   function parseHeaders(text) {
     let headers = {};
     try {
@@ -177,7 +296,6 @@
 
   async function sendRequest() {
     const headers = parseHeaders(headersInput.value || "");
-
     const payload = {
       deviceId: deviceIdInput.value,
       url: urlInput.value,
@@ -198,9 +316,10 @@
 
       const result = await res.json();
       const data = result.data || {};
-
       let bodyText = data.body;
-      try { bodyText = JSON.stringify(JSON.parse(data.body), null, 2); } catch (e) {}
+      try {
+        bodyText = JSON.stringify(JSON.parse(data.body), null, 2);
+      } catch {}
 
       responseBox.innerHTML = `
         <div>
@@ -209,7 +328,6 @@
           <pre>${bodyText || ''}</pre>
         </div>
       `;
-
       loadHistory();
     } catch (err) {
       responseBox.textContent = '请求错误: ' + err;
@@ -223,24 +341,35 @@
     const id = deviceIdInput.value;
     if (!id) return;
     try {
-      const res = await fetch(`/pay/api/postmain/proxy/history?deviceId=${id}`);
+      const res = await fetch(`/pay/api/postmain/proxy/history?deviceId=${id}&pageNum=${pageNum}&pageSize=${pageSize}`);
       const result = await res.json();
-      const historyList = result.data || [];
+
+      total = result.total || 0;
+      const historyList = result.rows || [];
 
       historyBox.innerHTML = '';
       historyList.forEach(item => {
         const div = document.createElement('div');
         div.className = 'history-item';
         div.textContent = `${item.method} ${item.url} (状态: ${item.statusCode}, 时间: ${item.createTime})`;
-        div.onclick = () => {
-          fillRequest(item);
-          closeHistory(); // 移动端点选后自动关闭抽屉
-        };
+        div.onclick = () => fillRequest(item);
         historyBox.appendChild(div);
       });
+
+      // 更新分页信息
+      const totalPages = Math.ceil(total / pageSize) || 1;
+      document.getElementById('pageInfo').textContent = `第 ${pageNum} / ${totalPages} 页`;
+      document.getElementById('prevPage').disabled = pageNum <= 1;
+      document.getElementById('nextPage').disabled = pageNum >= totalPages;
     } catch {
       historyBox.innerHTML = '<i>无法加载历史记录</i>';
     }
+  }
+
+  function changePage(delta) {
+    pageNum += delta;
+    if (pageNum < 1) pageNum = 1;
+    loadHistory();
   }
 
   function fillRequest(item) {
@@ -248,14 +377,18 @@
     methodSelect.value = item.method;
     headersInput.value = Object.entries(item.headers || {}).map(([k, v]) => `${k}: ${v}`).join("\n");
     bodyInput.value = item.body || "";
+
     if (item.headers && item.headers["Content-Type"]) {
       contentTypeSelect.value = item.headers["Content-Type"];
     }
+
+    // 📱 自动收起抽屉
+    document.querySelector('.history-panel').classList.remove('active');
   }
 
-  // 抽屉控制
-  function toggleHistory() { historyBox.classList.toggle("open"); }
-  function closeHistory() { historyBox.classList.remove("open"); }
+  function toggleHistory() {
+    document.querySelector('.history-panel').classList.toggle('active');
+  }
 </script>
 </body>
 </html>
