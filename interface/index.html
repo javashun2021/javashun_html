@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>API文档中心</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; }
+
+    .header {
+      background: #4CAF50;
+      color: white;
+      padding: 10px 15px;
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    .container {
+      display: flex;
+      height: calc(100vh - 50px);
+    }
+
+    /* 左侧目录 */
+    .sidebar {
+      width: 250px;
+      background: #f4f4f4;
+      border-right: 1px solid #ddd;
+      overflow-y: auto;
+      transition: transform 0.3s ease;
+    }
+    .sidebar.hidden {
+      transform: translateX(-100%);
+    }
+
+    .sidebar ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .sidebar li {
+      padding: 10px 15px;
+      cursor: pointer;
+      border-bottom: 1px solid #eee;
+    }
+    .sidebar li:hover {
+      background: #e0e0e0;
+    }
+    .sidebar .group {
+      font-weight: bold;
+      background: #ddd;
+    }
+
+    /* 右侧内容 */
+    .content {
+      flex: 1;
+      padding: 15px;
+      overflow-y: auto;
+    }
+
+    h2 { margin-top: 0; }
+
+    .api-info {
+      background: #fafafa;
+      border: 1px solid #ddd;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+    }
+
+    .api-info p {
+      margin: 5px 0;
+    }
+
+    .params, .headers {
+      margin-bottom: 10px;
+    }
+
+    .params input, .headers input {
+      width: 100%;
+      padding: 6px;
+      margin: 5px 0;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    button {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #45a049;
+    }
+
+    .result {
+      white-space: pre-wrap;
+      background: #1e1e1e;
+      color: #dcdcdc;
+      padding: 10px;
+      border-radius: 5px;
+      font-size: 14px;
+      margin-top: 10px;
+    }
+
+    /* 手机端样式 */
+    .toggle-btn {
+      display: none;
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      background: #333;
+      color: white;
+      padding: 8px 12px;
+      border-radius: 5px;
+      z-index: 1000;
+      cursor: pointer;
+    }
+
+    @media (max-width: 768px) {
+      .sidebar {
+        position: fixed;
+        top: 50px; left: 0; bottom: 0;
+        z-index: 999;
+      }
+      .toggle-btn {
+        display: block;
+      }
+      .content {
+        padding-top: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header" id="projectTitle">API文档中心</div>
+  <div class="toggle-btn" onclick="toggleSidebar()">目录</div>
+
+  <div class="container">
+    <div class="sidebar" id="sidebar">
+      <ul id="directoryList"></ul>
+    </div>
+    <div class="content">
+      <h2 id="apiName">请选择接口</h2>
+      <div class="api-info" id="apiDetail">
+        <p><strong>请求方式:</strong> <span id="method">-</span></p>
+        <p><strong>请求地址:</strong> <span id="url">-</span></p>
+        <div class="headers">
+          <h4>请求头</h4>
+          <div id="headers"></div>
+        </div>
+        <div class="params">
+          <h4>请求参数</h4>
+          <div id="params"></div>
+        </div>
+        <button onclick="sendRequest()">调试</button>
+        <div class="result" id="result">响应结果将在这里显示</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  const sidebar = document.getElementById("sidebar");
+  const directoryList = document.getElementById("directoryList");
+  let currentApi = null;
+
+  function toggleSidebar() {
+    sidebar.classList.toggle("hidden");
+  }
+
+  // 获取 URL 参数
+  function getQueryParam(name) {
+    const params = new URLSearchParams(window.location.search);
+    return params.get(name);
+  }
+
+  async function loadDirectory() {
+    try {
+      const pid = getQueryParam("pid") || 0; // 默认0
+      let res = await fetch("/pay/api/interface/list?pid=" + pid, { method: "POST" });
+      let data = await res.json();
+      if (data.code === 0 || data.code === 200) {
+        const projectName = data.data.project?.name || "未命名项目";
+        document.getElementById("projectTitle").textContent = "API文档中心 - " + projectName;
+        document.title = "API文档中心 - " + projectName;
+        renderDirectory(data.data.list || []);
+      } else {
+        directoryList.innerHTML = "<li>加载失败: " + data.msg + "</li>";
+      }
+    } catch (e) {
+      console.error("加载目录失败", e);
+      directoryList.innerHTML = "<li>加载失败: " + e + "</li>";
+    }
+  }
+
+  function renderDirectory(list) {
+    directoryList.innerHTML = "";
+
+    list.forEach(group => {
+      let groupLi = document.createElement("li");
+      groupLi.textContent = group.name;
+      groupLi.classList.add("group");
+      directoryList.appendChild(groupLi);
+
+      if (group.subList && group.subList.length > 0) {
+        let ul = document.createElement("ul");
+        ul.style.marginLeft = "15px";
+
+        group.subList.forEach(api => {
+          let apiLi = document.createElement("li");
+          apiLi.textContent = api.name;
+          apiLi.onclick = () => renderApiDetail(api);
+          ul.appendChild(apiLi);
+        });
+
+        directoryList.appendChild(ul);
+      }
+    });
+  }
+
+  function initSidebar() {
+    if (window.innerWidth > 768) {
+        sidebar.classList.remove("hidden"); // PC端默认展开
+    }
+  }
+
+    // 渲染输入框（记录路径为数组）
+function renderInputs(container, obj, path = []) {
+  Object.keys(obj).forEach(key => {
+    let value = obj[key];
+    let newPath = [...path, key];  // 记录层级路径数组
+
+    if (typeof value === "object" && value !== null) {
+      // 折叠节点
+      let section = document.createElement("div");
+      section.style.margin = "6px 0";
+
+      let toggle = document.createElement("div");
+      toggle.textContent = key + " ⯆";
+      toggle.style.cursor = "pointer";
+      toggle.style.fontWeight = "bold";
+      toggle.style.color = "#007acc";
+
+      let subContainer = document.createElement("div");
+      subContainer.style.marginLeft = "16px";
+
+      renderInputs(subContainer, value, newPath);
+
+      toggle.onclick = () => {
+        if (subContainer.style.display === "none") {
+          subContainer.style.display = "block";
+          toggle.textContent = key + " ⯆";
+        } else {
+          subContainer.style.display = "none";
+          toggle.textContent = key + " ⯈";
+        }
+      };
+
+      section.appendChild(toggle);
+      section.appendChild(subContainer);
+      container.appendChild(section);
+    } else {
+      // 普通输入框
+      let wrapper = document.createElement("div");
+      wrapper.style.marginBottom = "6px";
+
+      let label = document.createElement("span");
+      label.textContent = key + ": ";
+      label.style.marginRight = "6px";
+
+      let input = document.createElement("input");
+      input.value = value || "";
+      input.dataset.path = JSON.stringify(newPath); // 保存层级路径数组
+
+      wrapper.appendChild(label);
+      wrapper.appendChild(input);
+      container.appendChild(wrapper);
+    }
+  });
+}
+
+
+// 点击调试时，把所有 input 值还原成对象
+function collectInputs(container) {
+  let inputs = container.querySelectorAll("input");
+  let result = {};
+
+  inputs.forEach(input => {
+    let path = JSON.parse(input.dataset.path); // 取回路径数组
+    let val = input.value;
+
+    // 自动尝试转数字/布尔/json
+    try {
+      val = JSON.parse(val);
+    } catch {
+      // 不是 JSON 就当字符串
+    }
+
+    // 按路径写入对象
+    let target = result;
+    for (let i = 0; i < path.length - 1; i++) {
+      let key = path[i];
+      if (!target[key]) target[key] = {};
+      target = target[key];
+    }
+    target[path[path.length - 1]] = val;
+  });
+
+  return result;
+}
+
+
+
+  function renderApiDetail(api) {
+    currentApi = api;
+    document.getElementById("apiName").textContent = api.name;
+    document.getElementById("method").textContent = api.method;
+    document.getElementById("url").textContent = api.url;
+
+    // 请求头
+    const headersDiv = document.getElementById("headers");
+    headersDiv.innerHTML = "";
+    try {
+    let headers = JSON.parse(api.headers || "{}");
+    renderInputs(headersDiv, headers);
+    } catch {
+    headersDiv.innerHTML = "<p>无</p>";
+    }
+
+    // 参数
+    const paramsDiv = document.getElementById("params");
+    paramsDiv.innerHTML = "";
+    try {
+    let params = JSON.parse(api.parameter || "{}");
+    renderInputs(paramsDiv, params);
+    } catch {
+    paramsDiv.innerHTML = "<p>无</p>";
+    }
+
+
+    // ✅ 只在手机端自动收起
+    if (window.innerWidth <= 768) {
+        sidebar.classList.add("hidden");
+    }
+  }
+
+  function generateDeviceId() {
+    const info = [
+      navigator.userAgent,
+      navigator.language,
+      screen.width,
+      screen.height,
+      screen.colorDepth,
+      Intl.DateTimeFormat().resolvedOptions().timeZone
+    ].join("###");
+
+    let hash = 0;
+    for (let i = 0; i < info.length; i++) {
+      hash = (hash << 5) - hash + info.charCodeAt(i);
+      hash |= 0;
+    }
+    const devId = "dev-" + Math.abs(hash);
+    localStorage.setItem('deviceId', devId);
+    return devId;
+  }
+
+  async function sendRequest() {
+    if (!currentApi) return alert("请先选择接口");
+
+    const headersObj = collectInputs(document.getElementById("headers"));
+
+    const paramsObj = collectInputs(document.getElementById("params"));
+
+    const deviceId = generateDeviceId();
+
+    const payload = {
+      deviceId: deviceId,
+      url: currentApi.url,
+      method: currentApi.method.toUpperCase(),
+      headers: headersObj,
+      body: JSON.stringify(paramsObj)
+    };
+
+    try {
+      let res = await fetch("/pay/api/postmain/proxy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      let result = await res.json();
+      document.getElementById("result").textContent = JSON.stringify(result, null, 2);
+    } catch (e) {
+      document.getElementById("result").textContent = "请求失败: " + e;
+    }
+  }
+
+  // 初始化
+  loadDirectory();
+  initSidebar();
+</script>
+
+
+</body>
+</html>
