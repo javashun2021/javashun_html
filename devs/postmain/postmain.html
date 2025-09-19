@@ -6,7 +6,28 @@
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; }
     textarea, input, select { width: 100%; margin: 5px 0; padding: 5px; }
-    button { margin: 5px 0; padding: 6px 12px; }
+    button { margin: 5px 0; padding: 6px 12px; cursor: pointer; }
+    button.loading {
+      cursor: not-allowed;
+      opacity: 0.7;
+      position: relative;
+    }
+    button.loading::after {
+      content: "";
+      position: absolute;
+      right: -25px;
+      top: 50%;
+      width: 16px;
+      height: 16px;
+      margin-top: -8px;
+      border: 2px solid #ccc;
+      border-top-color: #333;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
     .history { border: 1px solid #ccc; padding: 10px; max-height: 200px; overflow-y: auto; }
     .history-item { cursor: pointer; padding: 5px; border-bottom: 1px solid #eee; }
     .history-item:hover { background: #f0f0f0; }
@@ -31,13 +52,21 @@
     <option value="DELETE">DELETE</option>
   </select>
 
-  <label>请求头 (JSON 格式):</label>
-  <textarea id="headers" rows="4">{}</textarea>
+  <label>内容类型(Content-Type):</label>
+  <select id="contentType" onchange="setContentType()">
+    <option value="application/json">application/json</option>
+    <option value="application/x-www-form-urlencoded">application/x-www-form-urlencoded</option>
+    <option value="text/xml">text/xml</option>
+    <option value="text/plain">text/plain</option>
+  </select>
 
-  <label>请求体 (JSON 格式):</label>
-  <textarea id="body" rows="4">{}</textarea>
+  <label>请求头 (支持 JSON 或 每行 `key: value` 格式):</label>
+  <textarea id="headers" rows="4">Content-Type: application/json</textarea>
 
-  <button onclick="sendRequest()">发送请求</button>
+  <label>请求体:</label>
+  <textarea id="body" rows="4"></textarea>
+
+  <button id="sendBtn" onclick="sendRequest()">发送请求</button>
 
   <h3>响应结果</h3>
   <pre id="response"></pre>
@@ -49,10 +78,12 @@
   const deviceIdInput = document.getElementById('deviceId');
   const urlInput = document.getElementById('url');
   const methodSelect = document.getElementById('method');
+  const contentTypeSelect = document.getElementById('contentType');
   const headersInput = document.getElementById('headers');
   const bodyInput = document.getElementById('body');
   const responseBox = document.getElementById('response');
   const historyBox = document.getElementById('history');
+  const sendBtn = document.getElementById('sendBtn');
 
   // 初始化设备ID
   window.onload = () => {
@@ -63,7 +94,7 @@
   };
 
   function generateDeviceId() {
-      const info = [
+    const info = [
       navigator.userAgent,
       navigator.language,
       screen.width,
@@ -72,23 +103,55 @@
       Intl.DateTimeFormat().resolvedOptions().timeZone
     ].join("###");
 
-    // 简单 hash
     let hash = 0;
     for (let i = 0; i < info.length; i++) {
       hash = (hash << 5) - hash + info.charCodeAt(i);
       hash |= 0;
     }
-    return "dev-" + Math.abs(hash);
+    const devId = "dev-" + Math.abs(hash);
+    deviceIdInput.value = devId;
+    localStorage.setItem('deviceId', devId);
+    return devId;
+  }
+
+  // 解析请求头，支持 JSON 或 每行 `key: value`
+  function parseHeaders(text) {
+    let headers = {};
+    try {
+      headers = JSON.parse(text);
+    } catch {
+      const lines = text.split("\n");
+      lines.forEach(line => {
+        const [key, ...rest] = line.split(":");
+        if (key && rest.length) {
+          headers[key.trim()] = rest.join(":").trim();
+        }
+      });
+    }
+    return headers;
+  }
+
+  // 根据下拉框更新 Content-Type
+  function setContentType() {
+    let headers = parseHeaders(headersInput.value);
+    headers["Content-Type"] = contentTypeSelect.value;
+    headersInput.value = Object.entries(headers).map(([k, v]) => `${k}: ${v}`).join("\n");
   }
 
   async function sendRequest() {
+    const headers = parseHeaders(headersInput.value || "");
+
     const payload = {
       deviceId: deviceIdInput.value,
       url: urlInput.value,
       method: methodSelect.value,
-      headers: JSON.parse(headersInput.value || '{}'),
-      body: JSON.parse(bodyInput.value || '{}')
+      headers,
+      body: bodyInput.value
     };
+
+    // 设置按钮 loading
+    sendBtn.classList.add("loading");
+    sendBtn.disabled = true;
 
     try {
       const res = await fetch('/pay/api/postmain/proxy', {
@@ -96,11 +159,30 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      const text = await res.text();
-      responseBox.textContent = text;
+
+      const result = await res.json();
+      const data = result.data || {};
+
+      let bodyText = data.body;
+      try {
+        bodyText = JSON.stringify(JSON.parse(data.body), null, 2);
+      } catch (e) {}
+
+      responseBox.innerHTML = `
+        <div>
+          <p><strong>Status:</strong> ${data.statusCodeValue || '-'} (${data.statusCode || '-'})</p>
+          <p><strong>Body:</strong></p>
+          <pre>${bodyText || ''}</pre>
+        </div>
+      `;
+
       loadHistory();
     } catch (err) {
       responseBox.textContent = '请求错误: ' + err;
+    } finally {
+      // 恢复按钮
+      sendBtn.classList.remove("loading");
+      sendBtn.disabled = false;
     }
   }
 
@@ -109,16 +191,18 @@
     if (!id) return;
     try {
       const res = await fetch(`/pay/api/postmain/proxy/history?deviceId=${id}`);
-      const history = await res.json();
+      const result = await res.json();
+      const historyList = result.data || [];
+
       historyBox.innerHTML = '';
-      history.forEach(item => {
+      historyList.forEach(item => {
         const div = document.createElement('div');
         div.className = 'history-item';
-        div.textContent = `${item.method} ${item.url} (${item.timestamp})`;
+        div.textContent = `${item.method} ${item.url} (状态: ${item.statusCode}, 时间: ${item.createTime})`;
         div.onclick = () => fillRequest(item);
         historyBox.appendChild(div);
       });
-    } catch (err) {
+    } catch {
       historyBox.innerHTML = '<i>无法加载历史记录</i>';
     }
   }
@@ -126,8 +210,12 @@
   function fillRequest(item) {
     urlInput.value = item.url;
     methodSelect.value = item.method;
-    headersInput.value = JSON.stringify(item.headers || {}, null, 2);
-    bodyInput.value = JSON.stringify(item.body || {}, null, 2);
+    headersInput.value = Object.entries(item.headers || {}).map(([k, v]) => `${k}: ${v}`).join("\n");
+    bodyInput.value = item.body || "";
+
+    if (item.headers && item.headers["Content-Type"]) {
+      contentTypeSelect.value = item.headers["Content-Type"];
+    }
   }
 </script>
 </body>
