@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>运维任务日志</title>
+  <style>
+    body {
+      font-family: Consolas, monospace;
+      background-color: #1e1e1e;
+      color: #dcdcdc;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background: #007acc;
+      padding: 15px;
+      color: white;
+    }
+    header h2 {
+      margin: 0;
+      font-size: 20px;
+    }
+    header p {
+      margin: 5px 0 0;
+      font-size: 14px;
+      color: #e0e0e0;
+    }
+    .server-info {
+      margin-top: 8px;
+      display: inline-block;
+      background: #444;
+      color: #ffcc00;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: bold;
+    }
+    #log-container {
+      padding: 15px;
+      height: 82vh;
+      overflow-y: auto;
+    }
+    .step {
+      background: #2d2d2d;
+      border-left: 5px solid #007acc;
+      margin-bottom: 15px;
+      padding: 10px 15px;
+      border-radius: 5px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+    .step-header {
+      font-weight: bold;
+      margin-bottom: 8px;
+      color: #9cdcfe;
+    }
+    .command {
+      color: #d7ba7d;
+    }
+    .result-log {
+      white-space: pre-wrap;
+      color: #b5cea8;
+    }
+    .error-log {
+      white-space: pre-wrap;
+      color: #f44747;
+    }
+    .status {
+      font-size: 12px;
+      margin-top: 5px;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h2 id="task-title">运维任务日志</h2>
+    <p id="task-desc"></p>
+    <div id="server-info" class="server-info" style="display:none;"></div>
+  </header>
+  <div id="log-container"></div>
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const taskId = urlParams.get("taskId");
+    const serverId = urlParams.get("serverId"); // ✅ 新增
+
+    const title = document.getElementById("task-title");
+    const desc = document.getElementById("task-desc");
+    const serverInfo = document.getElementById("server-info");
+    const container = document.getElementById("log-container");
+    let intervalId = null;
+
+    if (!taskId || !serverId) {  // ✅ 两个参数都必须有
+        container.innerHTML = "<p style='color:red;'>缺少参数 taskId 或 serverId</p>";
+    } else {
+        async function fetchLogs() {
+        try {
+            // ✅ 请求时带上 serverId
+            const res = await fetch(`/pay/api/ssh/result?taskId=${taskId}&serverId=${serverId}`);
+            const json = await res.json();
+            if (json.code !== 0) {
+            container.innerHTML = `<p style="color:red;">请求失败: ${json.msg}</p>`;
+            return;
+            }
+
+            const { taskLog = [], task = {} } = json.data || {};
+
+            // 更新任务信息
+            title.textContent = `${task.taskName || "未知任务"} (TaskId=${taskId})`;
+            desc.textContent = task.description || "";
+
+            if (task.remark) {
+            serverInfo.style.display = "inline-block";
+            serverInfo.textContent = `服务器: ${task.remark}`;
+            } else {
+            serverInfo.style.display = "none";
+            }
+
+            // 渲染日志
+            container.innerHTML = "";
+            let allFinished = true;
+
+            taskLog.forEach(step => {
+            if (step.status === 0 || step.status === 1) {
+                allFinished = false;
+            }
+
+            const div = document.createElement("div");
+            div.className = "step";
+            div.innerHTML = `
+                <div class="step-header">步骤 ${step.stepOrder}: <span class="command">${step.command}</span></div>
+                <div class="result-log">${step.resultLog || ""}</div>
+                ${step.errorLog ? `<div class="error-log">${step.errorLog}</div>` : ""}
+                <div class="status">状态: ${step.status}</div>
+            `;
+            container.appendChild(div);
+            });
+
+            container.scrollTop = container.scrollHeight;
+
+            if (allFinished && intervalId) {
+            clearInterval(intervalId);
+            intervalId = null;
+            }
+        } catch (e) {
+            container.innerHTML = `<p style="color:red;">请求出错: ${e.message}</p>`;
+        }
+        }
+
+        fetchLogs();
+        intervalId = setInterval(fetchLogs, 10000);
+    }
+    </script>
+
+</body>
+</html>
