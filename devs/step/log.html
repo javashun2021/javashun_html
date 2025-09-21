@@ -81,7 +81,7 @@
 <script>
     const urlParams = new URLSearchParams(window.location.search);
     const taskId = urlParams.get("taskId");
-    const serverId = urlParams.get("serverId"); // ✅ 新增
+    const serverId = urlParams.get("serverId");
 
     const title = document.getElementById("task-title");
     const desc = document.getElementById("task-desc");
@@ -89,67 +89,77 @@
     const container = document.getElementById("log-container");
     let intervalId = null;
 
-    if (!taskId || !serverId) {  // ✅ 两个参数都必须有
+    // 状态映射
+    const statusMap = {
+      0: "待执行",
+      1: "执行中",
+      2: "成功",
+      3: "失败"
+    };
+
+    if (!taskId || !serverId) {
         container.innerHTML = "<p style='color:red;'>缺少参数 taskId 或 serverId</p>";
     } else {
         async function fetchLogs() {
-        try {
-            // ✅ 请求时带上 serverId
-            const res = await fetch(`/pay/api/ssh/result?taskId=${taskId}&serverId=${serverId}`);
-            const json = await res.json();
-            if (json.code !== 0) {
-            container.innerHTML = `<p style="color:red;">请求失败: ${json.msg}</p>`;
-            return;
-            }
+          try {
+              const res = await fetch(`/pay/api/ssh/result?taskId=${taskId}&serverId=${serverId}`);
+              const json = await res.json();
+              if (json.code !== 0) {
+                container.innerHTML = `<p style="color:red;">请求失败: ${json.msg}</p>`;
+                return;
+              }
 
-            const { taskLog = [], task = {} } = json.data || {};
+              const { taskLog = [], task = {} } = json.data || {};
 
-            // 更新任务信息
-            title.textContent = `${task.taskName || "未知任务"} (TaskId=${taskId})`;
-            desc.textContent = task.description || "";
+              // 更新任务信息
+              title.textContent = `${task.taskName || "未知任务"} (TaskId=${taskId})`;
+              desc.textContent = task.description || "";
 
-            if (task.remark) {
-            serverInfo.style.display = "inline-block";
-            serverInfo.textContent = `服务器: ${task.remark}`;
-            } else {
-            serverInfo.style.display = "none";
-            }
+              if (task.remark) {
+                serverInfo.style.display = "inline-block";
+                serverInfo.textContent = `服务器: ${task.remark}`;
+              } else {
+                serverInfo.style.display = "none";
+              }
 
-            // 渲染日志
-            container.innerHTML = "";
-            let allFinished = true;
+              // 渲染日志
+              container.innerHTML = "";
+              let allFinished = true;
 
-            taskLog.forEach(step => {
-            if (step.status === 0 || step.status === 1) {
-                allFinished = false;
-            }
+              taskLog.forEach(step => {
+                if (step.status === 0 || step.status === 1) {
+                  allFinished = false;
+                }
 
-            const div = document.createElement("div");
-            div.className = "step";
-            div.innerHTML = `
-                <div class="step-header">步骤 ${step.stepOrder}: <span class="command">${step.command}</span></div>
-                <div class="result-log">${step.resultLog || ""}</div>
-                ${step.errorLog ? `<div class="error-log">${step.errorLog}</div>` : ""}
-                <div class="status">状态: ${step.status}</div>
-            `;
-            container.appendChild(div);
-            });
+                const div = document.createElement("div");
+                div.className = "step";
+                div.innerHTML = `
+                    <div class="step-header">步骤 ${step.stepOrder}: <span class="command">${step.command}</span></div>
+                    <div class="result-log">${step.resultLog || ""}</div>
+                    ${step.errorLog ? `<div class="error-log">${step.errorLog}</div>` : ""}
+                    <div class="status">
+                      状态: ${statusMap[step.status] ?? step.status}
+                      ${step.updateTime ? ` | 更新时间: ${step.updateTime}` : ""}
+                    </div>
+                `;
+                container.appendChild(div);
+              });
 
-            container.scrollTop = container.scrollHeight;
+              container.scrollTop = container.scrollHeight;
 
-            if (allFinished && intervalId) {
-            clearInterval(intervalId);
-            intervalId = null;
-            }
-        } catch (e) {
-            container.innerHTML = `<p style="color:red;">请求出错: ${e.message}</p>`;
-        }
+              if (allFinished && intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
+              }
+          } catch (e) {
+              container.innerHTML = `<p style="color:red;">请求出错: ${e.message}</p>`;
+          }
         }
 
         fetchLogs();
         intervalId = setInterval(fetchLogs, 10000);
     }
-    </script>
+</script>
 
 </body>
 </html>
