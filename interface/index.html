@@ -119,6 +119,90 @@
       z-index: 1000;
       cursor: pointer;
     }
+  /* ====== 样式：放到你的 <style> ====== */
+  .help-wrapper {
+    position: relative;
+    display: inline-block;
+    margin-left: 6px;
+    vertical-align: middle;
+    font-size: 12px;
+  }
+
+  /* 行内显示的简短说明（单行） */
+  .help-inline {
+    color: #666;
+    font-size: 12px;
+    margin-left: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 60vw; /* 防止超出屏幕 */
+  }
+
+  /* 圆形问号图标 */
+  .help-icon {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    line-height: 18px;
+    font-size: 12px;
+    font-weight: bold;
+    text-align: center;
+    color: #fff;
+    background-color: #007acc;
+    border-radius: 50%;
+    cursor: pointer;
+    user-select: none;
+    margin-left: 6px;
+    position: relative;
+  }
+
+  /* tooltip 气泡（默认单行显示、省略） */
+  .help-tooltip {
+    display: none; /* 初始隐藏，通过 JS 控制显示 */
+    position: absolute;
+    top: 26px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2000;
+    background: rgba(0,0,0,0.88);
+    color: #fff;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+
+    /* 强制横行显示（解决竖排问题） */
+    writing-mode: horizontal-tb !important;
+    unicode-bidi: isolate-override !important;
+
+    /* 默认单行且省略显示 */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: min(380px, calc(100vw - 40px));
+  }
+
+  /* 展开后的 tooltip（多行） */
+  .help-tooltip.expanded {
+    white-space: normal;
+    overflow-wrap: break-word;
+    text-overflow: clip;
+    max-width: min(680px, calc(100vw - 40px));
+  }
+
+  /* 小箭头（可选） */
+  .help-tooltip::after {
+    content: "";
+    position: absolute;
+    top: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 6px;
+    border-style: solid;
+    border-color: transparent transparent rgba(0,0,0,0.88) transparent;
+  }
+
 
     @media (max-width: 768px) {
       .sidebar {
@@ -200,6 +284,87 @@
     }
   }
 
+  /* ====== JS：渲染时使用的辅助函数（集成到 renderInputs 中） ====== */
+
+  /**
+   * 在 wrapper（当前字段容器）中创建帮助节点
+   * detailText: 要显示的完整说明文本（字符串）
+   * wrapper: 当前字段的 DOM 元素（label+input 父容器）
+   */
+  function appendHelpNode(detailText, wrapper) {
+    const helpWrapper = document.createElement('span');
+    helpWrapper.className = 'help-wrapper';
+
+    // 先测量文字实际宽度（单行）
+    const temp = document.createElement('span');
+    temp.style.position = 'absolute';
+    temp.style.visibility = 'hidden';
+    temp.style.whiteSpace = 'nowrap';
+    temp.style.fontSize = window.getComputedStyle(wrapper).fontSize || '12px';
+    temp.textContent = detailText;
+    document.body.appendChild(temp);
+    const textWidth = temp.getBoundingClientRect().width;
+    temp.remove();
+
+    // 计算容器右侧可用空间（到 params 区域右边界）
+    const paramsContainer = document.getElementById('params') || document.querySelector('.content');
+    const wrapperRect = wrapper.getBoundingClientRect();
+    const containerRect = paramsContainer.getBoundingClientRect();
+    const availableRight = containerRect.right - wrapperRect.right - 8; // 留点间隙
+
+    if (textWidth <= availableRight) {
+      // 空间够：直接行内显示（单行）
+      const span = document.createElement('span');
+      span.className = 'help-inline';
+      span.textContent = detailText;
+      helpWrapper.appendChild(span);
+      wrapper.appendChild(helpWrapper);
+      return;
+    }
+
+    // 空间不够：显示问号图标，点击展开 tooltip
+    const icon = document.createElement('span');
+    icon.className = 'help-icon';
+    icon.textContent = '?';
+
+    const tooltip = document.createElement('div');
+    tooltip.className = 'help-tooltip';
+    tooltip.innerHTML = detailText; // 可以包含 <b>、<code> 等 HTML
+
+    // 点击图标：切换展开 / 收起
+    icon.addEventListener('click', function (e) {
+      e.stopPropagation();
+      const isShown = tooltip.style.display === 'block';
+      // 先隐藏其它 open tooltip
+      document.querySelectorAll('.help-tooltip.expanded, .help-tooltip').forEach(el => {
+        if (el !== tooltip) { el.style.display = 'none'; el.classList.remove('expanded'); }
+      });
+      if (!isShown) {
+        tooltip.style.display = 'block';
+        // 如果内容超出单行则添加 expanded 让其多行显示
+        if (tooltip.scrollWidth > tooltip.clientWidth) {
+          tooltip.classList.add('expanded');
+        } else {
+          tooltip.classList.remove('expanded');
+        }
+      } else {
+        tooltip.style.display = 'none';
+        tooltip.classList.remove('expanded');
+      }
+    });
+
+    // 点击页面任意地方收起
+    document.addEventListener('click', () => {
+      tooltip.style.display = 'none';
+      tooltip.classList.remove('expanded');
+    });
+
+    helpWrapper.appendChild(icon);
+    helpWrapper.appendChild(tooltip);
+    wrapper.appendChild(helpWrapper);
+  }
+
+
   function renderDirectory(list) {
     directoryList.innerHTML = "";
 
@@ -230,12 +395,14 @@
         sidebar.classList.remove("hidden"); // PC端默认展开
     }
   }
+// 当前API的 remarkMap
+let currentRemarkMap = {};
 
-    // 渲染输入框（记录路径为数组）
+// 渲染输入框（记录路径为数组）
 function renderInputs(container, obj, path = []) {
   Object.keys(obj).forEach(key => {
     let value = obj[key];
-    let newPath = [...path, key];  // 记录层级路径数组
+    let newPath = [...path, key]; // 记录层级路径数组
 
     if (typeof value === "object" && value !== null) {
       // 折叠节点
@@ -280,6 +447,22 @@ function renderInputs(container, obj, path = []) {
       input.dataset.path = JSON.stringify(newPath); // 保存层级路径数组
 
       wrapper.appendChild(label);
+
+      if (currentRemarkMap[key]) {
+        let info = currentRemarkMap[key];
+        let helpWrapper = document.createElement("span");
+        helpWrapper.className = "help-wrapper";
+
+        // 详细说明文字
+        let detailText =
+          (info.required == 1 ? "[必填] " : "[可选] ") +
+          (info.type ? "(" + info.type + ") " : "") +
+          (info.remark ? info.remark + " " : "") +
+          (info.example ? "示例: " + info.example : "");
+        appendHelpNode(detailText.trim(), wrapper);
+      }
+
+
       wrapper.appendChild(input);
       container.appendChild(wrapper);
     }
@@ -317,39 +500,51 @@ function collectInputs(container) {
 }
 
 
+// 点击目录时调用
+function renderApiDetail(api) {
+  currentApi = api;
 
-  function renderApiDetail(api) {
-    currentApi = api;
-    document.getElementById("apiName").textContent = api.name;
-    document.getElementById("method").textContent = api.method;
-    document.getElementById("url").textContent = api.url;
+  document.getElementById("apiName").textContent = api.name || "未命名接口";
+  document.getElementById("method").textContent = api.method || "-";
+  document.getElementById("url").textContent = api.url || "-";
 
-    // 请求头
-    const headersDiv = document.getElementById("headers");
-    headersDiv.innerHTML = "";
-    try {
-    let headers = JSON.parse(api.headers || "{}");
-    renderInputs(headersDiv, headers);
-    } catch {
-    headersDiv.innerHTML = "<p>无</p>";
+  const headersDiv = document.getElementById("headers");
+  const paramsDiv = document.getElementById("params");
+  headersDiv.innerHTML = "";
+  paramsDiv.innerHTML = "";
+
+  // ✅ 直接取 subList 里的 remarkMap
+  currentRemarkMap = api.remarkMap || {};
+
+  // 渲染 headers
+  try {
+    let headersObj = {};
+    if (api.headers) {
+      headersObj = typeof api.headers === "string" ? JSON.parse(api.headers) : api.headers;
     }
-
-    // 参数
-    const paramsDiv = document.getElementById("params");
-    paramsDiv.innerHTML = "";
-    try {
-    let params = JSON.parse(api.parameter || "{}");
-    renderInputs(paramsDiv, params);
-    } catch {
-    paramsDiv.innerHTML = "<p>无</p>";
-    }
-
-
-    // ✅ 只在手机端自动收起
-    if (window.innerWidth <= 768) {
-        sidebar.classList.add("hidden");
-    }
+    renderInputs(headersDiv, headersObj);
+  } catch (e) {
+    console.warn("解析 headers 出错", e);
+    headersDiv.innerHTML = "<p>请求头解析失败</p>";
   }
+
+  // 渲染 parameter
+  try {
+    let paramsObj = {};
+    if (api.parameter) {
+      paramsObj = typeof api.parameter === "string" ? JSON.parse(api.parameter) : api.parameter;
+    }
+    renderInputs(paramsDiv, paramsObj);
+  } catch (e) {
+    console.warn("解析 parameter 出错", e);
+    paramsDiv.innerHTML = "<p>请求参数解析失败</p>";
+  }
+
+  // 手机端自动收起目录
+  if (window.innerWidth <= 768) {
+    sidebar.classList.add("hidden");
+  }
+}
 
   function generateDeviceId() {
     const info = [

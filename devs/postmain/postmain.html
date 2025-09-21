@@ -22,13 +22,15 @@
       min-height: calc(100vh - 50px);
     }
 
-    /* 历史请求区 */
+    /* ============ 历史请求区（默认：桌面可见） ============ */
     .history-panel {
       width: 280px;
       border-right: 2px solid #ddd;
       background: #fff;
       padding: 10px;
       overflow-y: auto;
+      box-sizing: border-box;
+      /* 在桌面保持自然布局（display:block 默认即可） */
     }
 
     .history-item {
@@ -41,7 +43,6 @@
     }
 
     /* 分页控件 */
-    /* 分页样式 —— 放在通用 button 规则之后 */
     .pagination {
       display: flex;
       align-items: center;
@@ -60,31 +61,24 @@
       cursor: pointer;
       transition: background .15s, color .15s, border-color .15s;
     }
-
-    /* 悬停（仅在非禁用时生效） */
     .pagination button:hover:not(:disabled) {
       background: #007bff;
       color: #fff;
     }
-
-    /* 禁用样式 —— 确保 selector 使用 class，不要用 #pagination */
     .pagination button:disabled,
     .pagination button[disabled] {
       background: #f0f0f0;
       color: #aaa;
       border-color: #ccc;
       cursor: not-allowed;
-      pointer-events: none; /* 防止点击事件仍触发 */
+      pointer-events: none;
       opacity: 0.9;
     }
-
-    /* 可选：页码文本样式 */
     #pageInfo {
       color: #333;
       font-weight: 600;
       margin: 0 8px;
     }
-
 
     /* 请求区 */
     .main-panel {
@@ -92,6 +86,7 @@
       padding: 20px;
       background: #fff;
       border-left: 2px solid #ddd;
+      box-sizing: border-box;
     }
 
     textarea, input, select {
@@ -100,6 +95,7 @@
       padding: 6px;
       border: 1px solid #ccc;
       border-radius: 4px;
+      box-sizing: border-box;
     }
 
     button {
@@ -141,31 +137,51 @@
       overflow-x: auto;
     }
 
-    /* 手机端样式 */
+    /* ============ 手机端：用 transform 抽屉 + 遮罩 ============ */
+    .overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.35);
+      z-index: 900;
+      transition: opacity .2s;
+    }
+    .overlay.active { display: block; }
+
     @media (max-width: 768px) {
       .container {
         flex-direction: column;
       }
+
+      /* 将面板变成固定抽屉，初始移出屏幕（左侧） */
       .history-panel {
-        display: none;
         position: fixed;
         top: 50px;
         left: 0;
         bottom: 0;
         width: 250px;
-        background: #fff;
-        border-right: 2px solid #ddd;
+        transform: translateX(-100%); /* 隐藏：移出屏幕 */
+        transition: transform .25s ease;
         z-index: 1000;
-        overflow-y: auto;
+        display: block; /* 保持 block，靠 transform 控制可见性 */
       }
+
+      /* 打开时滑入 */
       .history-panel.active {
-        display: block;
+        transform: translateX(0);
       }
+
       .toggle-history {
         display: block;
         margin: 10px;
       }
+
+      /* 在小屏幕上，为了避免主内容在抽屉打开时仍然有左边 border，移除 main-panel 的 left border */
+      .main-panel {
+        border-left: none;
+      }
     }
+
     @media (min-width: 769px) {
       .toggle-history {
         display: none;
@@ -176,6 +192,9 @@
 <body>
   <h2>Postmain Proxy 请求工具</h2>
   <button class="toggle-history" onclick="toggleHistory()">📜 查看历史请求</button>
+
+  <!-- 遮罩（仅移动端打开时启用） -->
+  <div id="overlay" class="overlay" onclick="closeHistory()"></div>
 
   <div class="container">
     <!-- 历史请求 -->
@@ -238,18 +257,67 @@
   const historyBox = document.getElementById('history');
   const sendBtn = document.getElementById('sendBtn');
 
+  const panel = document.querySelector('.history-panel');
+  const overlay = document.getElementById('overlay');
+
   // 分页参数
   let pageNum = 1;
   const pageSize = 10;
   let total = 0;
 
-  // 初始化设备ID
-  window.onload = () => {
+  // 判断是否为手机端
+  function isMobile() {
+    return window.innerWidth <= 768 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  }
+
+  // 初始化设备ID & 面板默认状态
+  window.addEventListener('DOMContentLoaded', () => {
     const savedId = localStorage.getItem('deviceId');
     if (savedId) deviceIdInput.value = savedId;
     else generateDeviceId();
+
+    // 加载历史（异步）
     loadHistory();
-  };
+
+    // 根据当前宽度设置面板初始状态：
+    if (isMobile()) {
+      panel.classList.remove('active'); // 隐藏（移出屏幕）
+      overlay.classList.remove('active');
+    } else {
+      panel.classList.add('active'); // 桌面端让它处于“展开”状态（常显）
+      overlay.classList.remove('active');
+    }
+  });
+
+  // 监听窗口尺寸变化，切换默认展开/收起（用户改横竖屏时友好）
+  window.addEventListener('resize', () => {
+    if (isMobile()) {
+      panel.classList.remove('active');
+      overlay.classList.remove('active');
+    } else {
+      panel.classList.add('active');
+      overlay.classList.remove('active');
+    }
+  });
+
+  function openHistory() {
+    panel.classList.add('active');
+    overlay.classList.add('active');
+  }
+  function closeHistory() {
+    panel.classList.remove('active');
+    overlay.classList.remove('active');
+  }
+  function toggleHistory() {
+    // 仅在移动端使用抽屉+遮罩体验；桌面上按钮隐藏但也安全无害
+    if (isMobile()) {
+      panel.classList.toggle('active');
+      overlay.classList.toggle('active');
+    } else {
+      // 桌面上不切换遮罩，保持常显（若你想让按钮也能收起桌面，可启用下一行）
+      // panel.classList.toggle('active');
+    }
+  }
 
   function generateDeviceId() {
     const info = [
@@ -382,12 +450,8 @@
       contentTypeSelect.value = item.headers["Content-Type"];
     }
 
-    // 📱 自动收起抽屉
-    document.querySelector('.history-panel').classList.remove('active');
-  }
-
-  function toggleHistory() {
-    document.querySelector('.history-panel').classList.toggle('active');
+    // 手机端选择记录后自动收起
+    if (isMobile()) closeHistory();
   }
 </script>
 </body>
