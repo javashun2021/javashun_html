@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>软件下载详情</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      background: #f4f6f9;
+    }
+    .container {
+      display: flex;
+      flex-direction: row;
+      padding: 20px;
+      max-width: 1200px;
+      margin: auto;
+    }
+    .sidebar {
+      width: 250px;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 15px;
+      margin-right: 20px;
+      display: none;
+    }
+    .sidebar h3 {
+      margin-top: 0;
+      font-size: 18px;
+    }
+    .sidebar ul {
+      list-style: none;
+      padding: 0;
+    }
+    .sidebar ul li {
+      margin: 8px 0;
+    }
+    .sidebar ul li a {
+      text-decoration: none;
+      color: #007bff;
+      cursor: pointer;
+    }
+    /* 高亮样式 */
+    .sidebar ul li a.active {
+      font-weight: bold;
+      color: #d9534f;
+    }
+    .content {
+      flex: 1;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 20px;
+    }
+    .logo {
+      max-width: 80px;
+      display: block;
+      margin-bottom: 15px;
+    }
+    .main-image {
+      max-width: 100%;
+      border-radius: 8px;
+      margin: 15px 0;
+    }
+    .download-btn {
+      display: inline-block;
+      background: #28a745;
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: bold;
+      margin: 10px 0;
+    }
+    .download-btn:hover {
+      background: #218838;
+    }
+    .description {
+      margin-top: 20px;
+      line-height: 1.6;
+    }
+    @media (max-width: 768px) {
+      .container {
+        flex-direction: column;
+      }
+      .sidebar {
+        width: 100%;
+        margin-bottom: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- 左侧历史版本 -->
+    <div class="sidebar" id="sidebar">
+      <h3>历史版本下载</h3>
+      <ul id="history-list"></ul>
+    </div>
+
+    <!-- 右侧内容 -->
+    <div class="content" id="content">
+      <img id="logo" class="logo" src="" alt="软件 Logo">
+      <h2 id="name"></h2>
+      <p><strong>版本号：</strong><span id="version"></span></p>
+      <p><strong>开发商：</strong><span id="developer"></span></p>
+      <p><strong>平台：</strong><span id="platforms"></span></p>
+      <p><strong>大小：</strong><span id="size"></span></p>
+      <a id="download-link" class="download-btn" href="#" target="_blank">立即下载</a>
+      <img id="main-image" class="main-image" src="" alt="主图">
+      <div class="description" id="description"></div>
+    </div>
+  </div>
+
+  <script>
+    function getQueryParam(param) {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get(param);
+    }
+
+    function renderContent(item) {
+      document.getElementById("logo").src = item.logoUrl;
+      document.getElementById("name").textContent = item.name;
+      document.getElementById("version").textContent = item.version;
+      document.getElementById("developer").textContent = item.developer;
+      document.getElementById("platforms").textContent = item.platforms;
+      document.getElementById("size").textContent = item.size;
+      document.getElementById("download-link").href = item.downloadUrl;
+      document.getElementById("main-image").src = item.mainImageUrl;
+      document.getElementById("description").innerHTML = item.description.replace(/\r\n/g, "<br>");
+    }
+
+    async function loadSoftwareDetail() {
+      const identifier = getQueryParam("identifier");
+      if (!identifier) {
+        document.getElementById("content").innerHTML = "<p>缺少软件标识 identifier</p>";
+        return;
+      }
+
+      try {
+        const res = await fetch(`/pay/api/software/list?identifier=${identifier}`);
+        const result = await res.json();
+
+        if (result.code !== 0 || !result.data || result.data.length === 0) {
+          document.getElementById("content").innerHTML = "<p>未找到软件信息</p>";
+          return;
+        }
+
+        const list = result.data;
+
+        // 默认显示第一个（最新版本）
+        renderContent(list[0]);
+
+        // 历史版本
+        if (list.length > 1) {
+          const sidebar = document.getElementById("sidebar");
+          sidebar.style.display = "block";
+          const historyList = document.getElementById("history-list");
+          historyList.innerHTML = "";
+
+          list.forEach((item, idx) => {
+            const li = document.createElement("li");
+            const a = document.createElement("a");
+            a.textContent = `${item.version} - ${item.releaseDate}`;
+            if (idx === 0) a.classList.add("active"); // 默认最新高亮
+            a.addEventListener("click", () => {
+              // 切换高亮
+              document.querySelectorAll("#history-list a").forEach(link => link.classList.remove("active"));
+              a.classList.add("active");
+              // 切换右侧内容
+              renderContent(item);
+            });
+            li.appendChild(a);
+            historyList.appendChild(li);
+          });
+        }
+      } catch (e) {
+        console.error("加载软件详情失败:", e);
+      }
+    }
+
+    loadSoftwareDetail();
+  </script>
+</body>
+</html>
