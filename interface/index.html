@@ -7,6 +7,14 @@
   <style>
     body { margin: 0; font-family: Arial, sans-serif; }
 
+     .remark {
+      background: #ed0408;
+      color: white;
+      padding: 10px 15px;
+      font-size: 18px;
+      font-weight: bold;
+    }
+
     .header {
       background: #4CAF50;
       color: white;
@@ -232,6 +240,10 @@
       <div class="api-info" id="apiDetail">
         <p><strong>请求方式:</strong> <span id="method">-</span></p>
         <p><strong>请求地址:</strong> <span id="url">-</span></p>
+        <div class="remark">
+          <h4>特别说明</h4>
+          <div id="remark"></div>
+        </div>
         <div class="headers">
           <h4>请求头</h4>
           <div id="headers"></div>
@@ -506,13 +518,21 @@ function collectInputs(container) {
     document.getElementById("method").textContent = api.method || "-";
     document.getElementById("url").textContent = api.url || "-";
 
+
+    const remarkDiv = document.getElementById("remark");
     const headersDiv = document.getElementById("headers");
     const paramsDiv = document.getElementById("params");
     const responseContent = document.getElementById("responseContent");
-
+    remarkDiv.innerHTML = "";
     headersDiv.innerHTML = "";
     paramsDiv.innerHTML = "";
     responseContent.innerHTML = "";
+    // 备注
+    if (api.remark) {
+      remarkDiv.innerHTML = "<pre>" + api.remark + "</pre>";
+    } else {
+      remarkDiv.innerHTML = "<pre>无备注</pre>";
+    }
 
     // 请求头
     if (api.headers) {
