@@ -244,11 +244,6 @@
             <h4>返回结果</h4>
             <div id="responseContent"></div>
         </div>
-        <button onclick="sendRequest()">调试</button>
-        <div class="result" id="resultArea">
-          <div id="statusButtons"></div>
-          <pre id="bodyResult"></pre>
-        </div>
 
       </div>
     </div>
@@ -566,61 +561,6 @@ function collectInputs(container) {
     localStorage.setItem('deviceId', devId);
     return devId;
   }
-
-  async function sendRequest() {
-    if (!currentApi) return alert("请先选择接口");
-
-    const headersObj = collectInputs(document.getElementById("headers"));
-    const paramsObj = collectInputs(document.getElementById("params"));
-    const deviceId = generateDeviceId();
-
-    const payload = {
-      deviceId: deviceId,
-      url: currentApi.url,
-      method: currentApi.method.toUpperCase(),
-      headers: headersObj,
-      body: JSON.stringify(paramsObj)
-    };
-
-    try {
-      let res = await fetch("/pay/api/postmain/proxy", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      let result = await res.json();
-
-      const statusButtons = document.getElementById("statusButtons");
-      const bodyResult = document.getElementById("bodyResult");
-      statusButtons.innerHTML = "";
-      bodyResult.textContent = "";
-
-      if (result.code === 0 && result.data) {
-        const data = result.data;
-
-        // 显示 statusCode 和 statusCodeValue
-        ["statusCode", "statusCodeValue"].forEach(key => {
-          let btn = document.createElement("button");
-          btn.textContent = key + ": " + data[key];
-          btn.style.marginRight = "8px";
-          statusButtons.appendChild(btn);
-        });
-
-        // 解析 body
-        try {
-          let parsed = JSON.parse(data.body);
-          bodyResult.textContent = JSON.stringify(parsed, null, 2);
-        } catch {
-          bodyResult.textContent = data.body || "";
-        }
-      } else {
-        bodyResult.textContent = "错误: " + (result.msg || "未知错误");
-      }
-    } catch (e) {
-      document.getElementById("resultArea").textContent = "请求失败: " + e;
-    }
-  }
-
   // 初始化
   loadDirectory();
   initSidebar();
