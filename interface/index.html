@@ -504,75 +504,48 @@ function collectInputs(container) {
 }
 
 
-// 点击目录时调用
-function renderApiDetail(api) {
-  currentApi = api;
+  function renderApiDetail(api) {
+    currentApi = api;
 
-  document.getElementById("apiName").textContent = api.name || "未命名接口";
-  document.getElementById("method").textContent = api.method || "-";
-  document.getElementById("url").textContent = api.url || "-";
+    document.getElementById("apiName").textContent = api.name || "未命名接口";
+    document.getElementById("method").textContent = api.method || "-";
+    document.getElementById("url").textContent = api.url || "-";
 
-  const headersDiv = document.getElementById("headers");
-  const paramsDiv = document.getElementById("params");
-  headersDiv.innerHTML = "";
-  paramsDiv.innerHTML = "";
-
-  // ✅ 直接取 subList 里的 remarkMap
-  currentRemarkMap = api.remarkMap || {};
-
-  // 渲染 headers
-  try {
-    let headersObj = {};
-    if (api.headers) {
-      headersObj = typeof api.headers === "string" ? JSON.parse(api.headers) : api.headers;
-    }
-    renderInputs(headersDiv, headersObj);
-  } catch (e) {
-    console.warn("解析 headers 出错", e);
-    headersDiv.innerHTML = "<p>"+api.headers+"</p>";
-  }
-
-  // 渲染 parameter
-  try {
-    let paramsObj = {};
-    if (api.parameter) {
-      paramsObj = typeof api.parameter === "string" ? JSON.parse(api.parameter) : api.parameter;
-    }
-    renderInputs(paramsDiv, paramsObj);
-  } catch (e) {
-    console.warn("解析 parameter 出错", e);
-    paramsDiv.innerHTML = "<p>"+api.parameter+"</p>";
-  }
-
-  // 渲染 response
-    let responseDiv = document.getElementById("response");
-    if (!responseDiv) {
-      responseDiv = document.createElement("div");
-      responseDiv.className = "response";
-      responseDiv.innerHTML = "<h4>返回结果</h4><div id='responseContent'></div>";
-      document.getElementById("apiDetail").appendChild(responseDiv);
-    }
-
+    const headersDiv = document.getElementById("headers");
+    const paramsDiv = document.getElementById("params");
     const responseContent = document.getElementById("responseContent");
+
+    headersDiv.innerHTML = "";
+    paramsDiv.innerHTML = "";
     responseContent.innerHTML = "";
 
+    // 请求头
+    if (api.headers) {
+      headersDiv.innerHTML = "<pre>" + api.headers + "</pre>";
+    } else {
+      headersDiv.innerHTML = "<pre>无请求头</pre>";
+    }
+
+    // 请求参数
+    if (api.parameter) {
+      paramsDiv.innerHTML = "<pre>" + api.parameter + "</pre>";
+    } else {
+      paramsDiv.innerHTML = "<pre>无请求参数</pre>";
+    }
+
+    // 返回结果
     if (api.response) {
-      try {
-        let responseObj = typeof api.response === "string" ? JSON.parse(api.response) : api.response;
-        responseContent.innerHTML = "<pre>" + JSON.stringify(responseObj, null, 2) + "</pre>";
-      } catch (e) {
-        responseContent.innerHTML = "<pre>" + api.response + "</pre>";
-      }
+      responseContent.innerHTML = "<pre>" + api.response + "</pre>";
     } else {
       responseContent.innerHTML = "<pre>无返回信息</pre>";
     }
 
-  
-  // 手机端自动收起目录
-  if (window.innerWidth <= 768) {
-    sidebar.classList.add("hidden");
+    // 手机端自动收起目录
+    if (window.innerWidth <= 768) {
+      sidebar.classList.add("hidden");
+    }
   }
-}
+
 
   function generateDeviceId() {
     const info = [
