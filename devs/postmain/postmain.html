@@ -211,8 +211,9 @@
     <!-- 请求工具 -->
     <div class="main-panel">
       <label>设备唯一ID:</label>
-      <input type="text" id="deviceId" placeholder="输入或生成设备ID" oninput="handleChange(this.value)">
+      <input type="text" id="deviceId" placeholder="输入或生成设备ID">
       <button onclick="generateDeviceId()">生成随机ID</button>
+      <button onclick="handleQuery()">查询</button>
 
       <label>请求 URL:</label>
       <input type="text" id="url" placeholder="https://example.com/api">
@@ -298,9 +299,6 @@
       panel.classList.add('active');
       overlay.classList.remove('active');
     }
-    deviceIdInput.addEventListener("input", (e) => {
-      handleChange(e.target.value);
-    });
   });
 
   function openHistory() {
@@ -408,8 +406,7 @@
     }
   }
 
-  function handleChange(value) {
-    console.log("输入框内容变化：", value);
+  function handleQuery() {
     loadHistory()
   }
 
