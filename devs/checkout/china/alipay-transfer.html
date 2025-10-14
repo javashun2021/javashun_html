@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>支付宝转账收银台</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f7f8fa;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 480px;
+      margin: 40px auto;
+      background: #fff;
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+      font-size: 1.4rem;
+    }
+    .notice {
+      border: 2px solid #f00;
+      padding: 10px;
+      background-color: #fff5f5;
+      border-radius: 8px;
+      color: #d10000;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      margin-bottom: 15px;
+    }
+    .info-box {
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      padding: 16px;
+      background: #fafafa;
+      margin-top: 10px;
+    }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      font-size: 1rem;
+    }
+    .info-label {
+      color: #666;
+    }
+    .info-value {
+      font-weight: bold;
+      color: #000;
+    }
+    .countdown {
+      text-align: center;
+      font-size: 1.1rem;
+      margin-top: 10px;
+      font-weight: bold;
+    }
+    .countdown span {
+      color: #f00;
+    }
+    .btn {
+      display: block;
+      width: 100%;
+      margin-top: 20px;
+      padding: 12px;
+      background: #1890ff;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    .btn:hover {
+      background: #40a9ff;
+    }
+    @media (max-width: 600px) {
+      .container {
+        margin: 20px;
+        padding: 16px;
+      }
+      h2 {
+        font-size: 1.2rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>支付宝转账收银台</h2>
+
+    <!-- 提示框 -->
+    <div class="notice">
+      请在支付时间内完成转账，此订单仅能支付一次。<br>
+      若5分钟内未到账，请联系客服查单，查单需提供转账凭证。<br>
+      超过24小时不予处理。如超时支付、重复支付、金额错误等导致无法到账，概不负责。<br>
+      请勿相信本页以外的任何付款方式，以免被骗！
+    </div>
+
+    <!-- 倒计时 -->
+    <div class="countdown">支付倒计时：<span id="timer">03分00秒</span></div>
+
+    <!-- 支付信息 -->
+    <div class="info-box">
+      <div class="info-row">
+        <div class="info-label">收款人姓名：</div>
+        <div class="info-value" id="realName">--</div>
+      </div>
+      <div class="info-row">
+        <div class="info-label">支付宝账号：</div>
+        <div class="info-value" id="alipayAccount">--</div>
+      </div>
+      <div class="info-row">
+        <div class="info-label">支付金额：</div>
+        <div class="info-value" id="amount">-- 元</div>
+      </div>
+      <div class="info-row">
+        <div class="info-label">订单号：</div>
+        <div class="info-value" id="orderNo">--</div>
+      </div>
+    </div>
+
+    <button class="btn" onclick="copyAccount()">复制支付宝账号</button>
+  </div>
+
+  <script>
+    // 获取 URL 参数
+    function getQueryParams() {
+      const params = {};
+      const search = new URLSearchParams(window.location.search);
+      for (const [key, value] of search.entries()) {
+        params[key] = decodeURIComponent(value);
+      }
+      return params;
+    }
+
+    // 姓名打码：保留姓氏，其余用*号替代
+    function maskName(name) {
+      if (!name) return "--";
+      return name[0] + "*".repeat(name.length - 1);
+    }
+
+    // 支付宝账号打码：保留前3和后2位
+    function maskAccount(acc) {
+      if (!acc) return "--";
+      if (acc.length <= 5) return acc[0] + "***";
+      return acc.slice(0, 3) + "****" + acc.slice(-2);
+    }
+
+    // 填充信息
+    function fillData(params) {
+      document.getElementById("realName").textContent = maskName(params.realName);
+      document.getElementById("alipayAccount").textContent = params.account;
+      document.getElementById("amount").textContent = params.amount ? params.amount + " 元" : "-- 元";
+      document.getElementById("orderNo").textContent = params.orderNo || "--";
+    }
+
+    // 倒计时
+    function startCountdown(minutes = 3) {
+      let totalSeconds = minutes * 60;
+      const timerEl = document.getElementById("timer");
+      const timer = setInterval(() => {
+        const min = Math.floor(totalSeconds / 60);
+        const sec = totalSeconds % 60;
+        timerEl.textContent = `${String(min).padStart(2, '0')}分${String(sec).padStart(2, '0')}秒`;
+        if (totalSeconds <= 0) {
+          clearInterval(timer);
+          timerEl.textContent = "00分00秒";
+          alert("支付时间已到，请重新下单！");
+        }
+        totalSeconds--;
+      }, 1000);
+    }
+
+    // 复制账号
+    function copyAccount() {
+      const account = new URLSearchParams(window.location.search).get("account");
+      if (account) {
+        navigator.clipboard.writeText(account).then(() => {
+          alert("支付宝账号已复制！");
+        });
+      } else {
+        alert("未检测到支付宝账号");
+      }
+    }
+
+    // 初始化
+    const params = getQueryParams();
+    fillData(params);
+    startCountdown(3);
+  </script>
+</body>
+</html>

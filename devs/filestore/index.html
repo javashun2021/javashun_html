@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>简易文件管理器</title>
+  <style>
+    :root{--bg:#f4f6f8;--card:#fff;--muted:#6b7280;--accent:#2563eb}
+    body{font-family:Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;margin:0;background:var(--bg);color:#111}
+    .app{max-width:1100px;margin:28px auto;padding:18px}
+    .btn{background:var(--accent);color:white;padding:8px 12px;border-radius:8px;border:0;cursor:pointer}
+    .btn.secondary{background:#eef2ff;color:var(--accent);border:1px solid rgba(37,99,235,.12)}
+    .file{background:#fff;padding:10px;border-radius:10px;border:1px solid #eef2f6;display:flex;flex-direction:column;gap:8px;min-height:110px}
+    .thumb{width:48px;height:48px;background:#f3f4f6;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--muted)}
+    .files{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
+    .muted{color:var(--muted);font-size:13px}
+    .breadcrumb{margin-bottom:12px;color:var(--muted)}
+    .breadcrumb span{cursor:pointer;color:var(--accent)}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h2>文件管理器</h2>
+    <div style="display:flex;gap:10px;margin-bottom:10px">
+      <label class="btn" for="fileInput">上传文件</label>
+      <input id="fileInput" type="file" multiple style="display:none">
+      <button id="refresh" class="btn secondary">刷新</button>
+    </div>
+
+    <div id="breadcrumb" class="breadcrumb"></div>
+    <div id="files" class="files"></div>
+  </div>
+
+<script>
+const API_UPLOAD = '/pay/api/file/upload';
+const API_DOWNLOAD = '/pay/api/file/download?'; // 改为基础 URL
+const API_LIST = '/pay/api/file/list';
+let allFiles = [];     // 所有文件与目录
+let currentPath = '/'; // 当前目录路径
+
+async function fetchFiles() {
+  const res = await fetch(API_LIST);
+  const data = await res.json();
+  if (data.code === 0) {
+    allFiles = data.data || [];
+    renderFiles();
+  } else {
+    alert('加载文件失败：' + data.msg);
+  }
+}
+
+function renderFiles() {
+  const wrap = document.getElementById('files');
+  wrap.innerHTML = '';
+
+  // 更新面包屑导航
+  renderBreadcrumb();
+
+  // 获取当前目录下的文件
+  const files = allFiles.filter(f => {
+    if (currentPath === '/') {
+      return f.parentId === 0;
+    } else {
+      const parent = allFiles.find(p => p.path === currentPath);
+      return parent && f.parentId === parent.id;
+    }
+  });
+
+  if (files.length === 0) {
+    wrap.innerHTML = '<div class="muted">暂无文件</div>';
+    return;
+  }
+
+  files.forEach(f => {
+    const div = document.createElement('div');
+    div.className = 'file';
+    const icon = f.type === 'DIRECTORY' ? '📁' : getIcon(f.name);
+    const sizeText = f.type === 'FILE' ? ((f.size / 1024).toFixed(1) + ' KB') : '';
+    // 注意：onclick 里传的是文件的 path（完整路径），downloadFile 会从中提取 fileName 并传给后端
+    div.innerHTML = `
+      <div class="thumb">${icon}</div>
+      <div><strong>${f.name}</strong></div>
+      <div class="muted">${sizeText}</div>
+      <div style="margin-top:auto">
+        ${f.type === 'FILE'
+          ? `<button class="btn secondary small" onclick="downloadFile('${f.path.replace(/'/g, "\\'")}')">下载</button>`
+          : `<button class="btn secondary small" onclick="enterDir('${f.path.replace(/'/g, "\\'")}')">打开</button>`}
+      </div>`;
+    wrap.appendChild(div);
+  });
+}
+
+function renderBreadcrumb(){
+  const bc = document.getElementById('breadcrumb');
+  const parts = currentPath.split('/').filter(Boolean);
+  let html = `<span onclick="enterDir('/')">根目录</span>`;
+  let pathAcc = '';
+  parts.forEach((p, i)=>{
+    pathAcc += '/' + p;
+    html += ` / <span onclick="enterDir('${pathAcc}')">${p}</span>`;
+  });
+  bc.innerHTML = html;
+}
+
+function enterDir(path){
+  currentPath = path;
+  renderFiles();
+}
+
+function getIcon(name){
+  const ext = name.split('.').pop().toLowerCase();
+  if(['png','jpg','jpeg','gif'].includes(ext)) return '🖼️';
+  if(['pdf'].includes(ext)) return '📕';
+  if(['zip','rar'].includes(ext)) return '🗜️';
+  if(['txt','md','doc','docx'].includes(ext)) return '📄';
+  return '📦';
+}
+
+// --------------- 修改点：下载时同时传 fileName 和 path ---------------
+function downloadFile(filePath){
+  const fileName = filePath.split('/').pop();
+  const path = filePath.substring(0, filePath.lastIndexOf('/'));
+  const url = `${API_DOWNLOAD}fileName=${encodeURIComponent(fileName)}&path=${encodeURIComponent(path)}`;
+  window.open(url);
+}
+// ----------------------------------------------------------------------
+
+document.getElementById('fileInput').addEventListener('change', e=>{
+  const filesList = Array.from(e.target.files);
+  uploadFiles(filesList);
+  e.target.value='';
+});
+
+async function uploadFiles(selectedFiles) {
+  for (const file of selectedFiles) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await fetch(API_UPLOAD, { method: 'POST', body: formData });
+    const data = await res.json();
+    if (data.code === 0) {
+      alert('上传成功：' + data.originalFilename);
+    } else {
+      alert('上传失败：' + data.msg);
+    }
+  }
+  await fetchFiles();
+}
+
+document.getElementById('refresh').addEventListener('click', ()=>{
+  fetchFiles();
+});
+
+// 初始化加载
+fetchFiles();
+</script>
+</body>
+</html>

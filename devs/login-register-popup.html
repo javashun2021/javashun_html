@@ -198,7 +198,7 @@
       if(pwd.length<6){ setError(document.getElementById('regError'),'密码至少6位'); return; }
       if(pwd!==conf){ setError(document.getElementById('regError'),'两次密码不一致'); return; }
 
-      fetch('/api/login/register', {method:'POST', body: JSON.stringify({
+      fetch('/pay/api/login/register', {method:'POST', body: JSON.stringify({
         username:username,password:pwd
       })}).then(res=>res.json()).then(data=>{
         if(data.code===0){
