@@ -333,7 +333,7 @@
         url: donePaidUrl + '&photos=' + encodeURIComponent(photos.join(',')),
         method: "GET",
         headers: {
-          "Content-Type": "application/www-form-urlencoded"
+          "Content-Type": "application/x-www-form-urlencoded"  // 修正这里
         }
       };
 
@@ -351,25 +351,29 @@
         }
 
         const result = await response.json();
-    
+        
+        console.log('代理返回结果:', result); // 添加日志便于调试
+        
         // 判断代理请求是否成功 (code === 0)
         if (result.code === 0) {
           // 解析实际业务返回的数据
           const businessData = JSON.parse(result.data.body);
           
+          console.log('业务返回结果:', businessData); // 添加日志便于调试
+          
           // 判断业务请求是否成功 (businessData.code === 1)
           if (businessData.code === 1) {
             alert("支付确认提交成功！");
           } else {
-            alert("业务处理失败：" + (businessData.message || "未知错误"));
+            alert("提交失败：" + (businessData.message || "未知错误"));
           }
         } else {
-          alert("代理请求失败：" + (result.msg || "未知错误"));
+          alert("请求失败：" + (result.msg || "未知错误"));
         }
         
       } catch (error) {
         console.error('Request failed:', error);
-        throw error;
+        alert("网络错误：" + error.message);
       }
     }
   </script>
