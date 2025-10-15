@@ -261,23 +261,16 @@
     e.preventDefault();
 
     const donePaidUrl = params.donePaidUrl;
-    const donePaidParam = params.donePaidParam ? JSON.parse(params.donePaidParam) : null;
-
+   
     if (!donePaidUrl) {
       alert("未检测到 donePaidUrl 参数！");
       return;
     }
 
-    // 收集表单输入
-    const payload = {
-      ...donePaidParam
-    };
-
     try {
       const resp = await fetch(donePaidUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
       });
 
       const result = await resp.json();
