@@ -180,7 +180,6 @@
     // 主逻辑
     const params = getQueryParams();
     fillData(params);
-    startCountdown(3);
 
      // 从参数 timeout 获取分钟数（默认10分钟）
     const timeoutMinutes = params.timeout ? parseInt(params.timeout, 10) : 10;
