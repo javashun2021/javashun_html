@@ -67,7 +67,7 @@
     .btn {
       display: block;
       width: 100%;
-      margin-top: 20px;
+      margin-top: 15px;
       padding: 12px;
       background: #1890ff;
       color: #fff;
@@ -75,9 +75,43 @@
       border-radius: 8px;
       font-size: 1rem;
       cursor: pointer;
+      font-weight: bold;
     }
     .btn:hover {
       background: #40a9ff;
+    }
+    .btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .btn-copy {
+      background: #52c41a;
+    }
+    .btn-copy:hover {
+      background: #73d13d;
+    }
+    .btn-submit {
+      background: #fa8c16;
+    }
+    .btn-submit:hover {
+      background: #faad14;
+    }
+    .form-group {
+      margin-top: 20px;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+      font-size: 0.9rem;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 1rem;
+      box-sizing: border-box;
     }
     @media (max-width: 600px) {
       .container {
@@ -125,7 +159,15 @@
       </div>
     </div>
 
-    <button class="btn" onclick="copyAccount()">复制支付宝账号</button>
+    <button class="btn btn-copy" onclick="copyAccount()">复制支付宝账号</button>
+
+    <!-- 支付凭证提交 -->
+    <div class="form-group">
+      <label for="photos">支付凭证（截图URL，多个用逗号分隔）</label>
+      <input type="text" id="photos" name="photos" placeholder="例如：http://example.com/photo1.jpg,http://example.com/photo2.jpg" required />
+    </div>
+
+    <button class="btn btn-submit" onclick="submitPayment()" id="submit-btn">我已支付完成</button>
   </div>
 
   <script>
@@ -148,16 +190,20 @@
     }
 
     // 倒计时
+    let countdownTimer;
     function startCountdown(minutes = 10) {
       let totalSeconds = minutes * 60;
       const timerEl = document.getElementById("timer");
-      const timer = setInterval(() => {
+      const submitBtn = document.getElementById("submit-btn");
+
+      countdownTimer = setInterval(() => {
         const min = Math.floor(totalSeconds / 60);
         const sec = totalSeconds % 60;
         timerEl.textContent = `${String(min).padStart(2, '0')}分${String(sec).padStart(2, '0')}秒`;
         if (totalSeconds <= 0) {
-          clearInterval(timer);
+          clearInterval(countdownTimer);
           timerEl.textContent = "00分00秒";
+          submitBtn.disabled = true;
           alert("支付时间已到，请重新下单！");
         }
         totalSeconds--;
@@ -173,6 +219,98 @@
         });
       } else {
         alert("未检测到支付宝账号");
+      }
+    }
+
+    // 生成设备ID
+    function generateDeviceId() {
+      return 'device_' + Math.random().toString(36).substr(2, 9);
+    }
+
+    // 提交支付
+    async function submitPayment() {
+      const submitBtn = document.getElementById("submit-btn");
+      const photosInput = document.getElementById("photos").value;
+      const params = getQueryParams();
+      const donePaidUrl = params.donePaidUrl;
+
+      if (!photosInput.trim()) {
+        alert("请填写支付凭证截图URL！");
+        return;
+      }
+
+      if (!donePaidUrl) {
+        alert("未检测到回调URL参数！");
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = '提交中...';
+
+      try {
+        await sendRequest(donePaidUrl, photosInput.split(',').map(url => url.trim()).filter(url => url));
+      } catch (error) {
+        console.error("提交失败:", error);
+        alert("提交失败：" + error.message);
+        submitBtn.disabled = false;
+        submitBtn.textContent = '我已支付完成';
+      }
+    }
+
+    // 发送请求
+    async function sendRequest(donePaidUrl, photos) {
+      const proxyPayload = {
+        deviceId: generateDeviceId(),
+        url: donePaidUrl + '&photos=' + encodeURIComponent(photos.join(',')),
+        method: "GET",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        }
+      };
+
+      try {
+        const response = await fetch('/pay/api/postmain/proxy', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(proxyPayload)
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP错误: ${response.status}`);
+        }
+
+        const result = await response.json();
+        console.log('完整响应:', result);
+
+        if (result.code === 0 && result.data && result.data.body) {
+          const businessData = JSON.parse(result.data.body);
+          console.log('业务数据:', businessData);
+          
+          if (businessData.code === 1) {
+            alert("✅ 支付确认提交成功！");
+            document.getElementById("submit-btn").textContent = '提交成功';
+            return true;
+          } else {
+            alert(`❌ 提交失败: ${businessData.message || "请稍后重试"}`);
+            document.getElementById("submit-btn").disabled = false;
+            document.getElementById("submit-btn").textContent = '我已支付完成';
+            return false;
+          }
+        } else {
+          alert(`❌ 请求失败: ${result.msg || "网络异常"}`);
+          document.getElementById("submit-btn").disabled = false;
+          document.getElementById("submit-btn").textContent = '我已支付完成';
+          return false;
+        }
+        
+      } catch (error) {
+        console.error('请求失败:', error);
+        alert(`❌ 网络错误: ${error.message}`);
+        document.getElementById("submit-btn").disabled = false;
+        document.getElementById("submit-btn").textContent = '我已支付完成';
+        return false;
       }
     }
 
