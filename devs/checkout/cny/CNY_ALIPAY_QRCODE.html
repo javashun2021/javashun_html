@@ -159,8 +159,8 @@
       if (params.realName) realNameInfo.textContent = "真实姓名：" + params.realName; // ✅ 新增
     }
 
-    // 倒计时（默认3分钟）
-    function startCountdown(minutes = 3) {
+    // 倒计时函数
+    function startCountdown(minutes = 10) {
       let totalSeconds = minutes * 60;
       const timerEl = document.getElementById("timer");
 
@@ -182,6 +182,10 @@
     fillData(params);
     startCountdown(3);
 
+     // 从参数 timeout 获取分钟数（默认10分钟）
+    const timeoutMinutes = params.timeout ? parseInt(params.timeout, 10) : 10;
+    startCountdown(isNaN(timeoutMinutes) ? 10 : timeoutMinutes);
+    
     // 刷新二维码
     document.getElementById("refreshBtn").addEventListener("click", () => {
       if (params.qr) {

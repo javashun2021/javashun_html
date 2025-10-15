@@ -203,8 +203,8 @@
       document.documentElement.lang = lang;
     }
 
-    // 倒计时功能（3分钟）
-    function startCountdown(minutes = 10) {
+     // 倒计时功能（timeout分钟）
+    function startCountdown(minutes) {
       let totalSeconds = minutes * 60;
       const timerEl = document.getElementById("timer");
 
@@ -221,7 +221,7 @@
       }, 1000);
     }
 
-    startCountdown(3); // 启动3分钟倒计时
+    //startCountdown(3); // 启动3分钟倒计时
 
     // 解析 URL 参数
     function getQueryParams() {
@@ -251,6 +251,11 @@
 
     const params = getQueryParams();
     fillForm(params);
+
+    // 从参数 timeout 获取分钟数（默认3分钟）
+    const timeoutMinutes = params.timeout ? parseInt(params.timeout, 10) : 10;
+    startCountdown(isNaN(timeoutMinutes) ? 10 : timeoutMinutes);
+
 
     document.getElementById("checkout-form").addEventListener("submit", (e) => {
       e.preventDefault();

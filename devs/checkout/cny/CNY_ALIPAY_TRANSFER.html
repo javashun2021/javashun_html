@@ -103,7 +103,7 @@
     </div>
 
     <!-- 倒计时 -->
-    <div class="countdown">支付倒计时：<span id="timer">03分00秒</span></div>
+    <div class="countdown">支付倒计时：<span id="timer">10分00秒</span></div>
 
     <!-- 支付信息 -->
     <div class="info-box">
@@ -139,29 +139,16 @@
       return params;
     }
 
-    // 姓名打码：保留姓氏，其余用*号替代
-    function maskName(name) {
-      if (!name) return "--";
-      return name[0] + "*".repeat(name.length - 1);
-    }
-
-    // 支付宝账号打码：保留前3和后2位
-    function maskAccount(acc) {
-      if (!acc) return "--";
-      if (acc.length <= 5) return acc[0] + "***";
-      return acc.slice(0, 3) + "****" + acc.slice(-2);
-    }
-
     // 填充信息
     function fillData(params) {
-      document.getElementById("realName").textContent = params.realName;
-      document.getElementById("alipayAccount").textContent = params.account;
+      document.getElementById("realName").textContent = params.realName || "--";
+      document.getElementById("alipayAccount").textContent = params.account || "--";
       document.getElementById("amount").textContent = params.amount ? params.amount + " 元" : "-- 元";
       document.getElementById("orderNo").textContent = params.orderNo || "--";
     }
 
     // 倒计时
-    function startCountdown(minutes = 3) {
+    function startCountdown(minutes = 10) {
       let totalSeconds = minutes * 60;
       const timerEl = document.getElementById("timer");
       const timer = setInterval(() => {
@@ -192,7 +179,10 @@
     // 初始化
     const params = getQueryParams();
     fillData(params);
-    startCountdown(3);
+
+    // 从参数 timeout 获取分钟数（默认10分钟）
+    const timeoutMinutes = params.timeout ? parseInt(params.timeout, 10) : 10;
+    startCountdown(isNaN(timeoutMinutes) ? 10 : timeoutMinutes);
   </script>
 </body>
 </html>
