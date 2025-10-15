@@ -330,7 +330,7 @@
       // 通过代理转发请求
       const proxyPayload = {
         deviceId: generateDeviceId(),
-        url: donePaidUrl+'&photos='+photos,
+        url: donePaidUrl + '&photos=' + encodeURIComponent(photos.join(',')),
         method: "POST",
         headers: {
           "Content-Type": "application/www-form-urlencoded"
