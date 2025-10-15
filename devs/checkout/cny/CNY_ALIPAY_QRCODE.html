@@ -69,7 +69,6 @@
       color: #555;
       margin-top: 6px;
     }
-    /* 新增姓名栏样式 */
     .real-name {
       font-size: 0.9rem;
       color: #333;
@@ -79,7 +78,7 @@
     /* 按钮样式 */
     .btn {
       display: inline-block;
-      margin-top: 20px;
+      margin: 10px 5px;
       padding: 10px 20px;
       background: #1890ff;
       color: #fff;
@@ -87,9 +86,46 @@
       border-radius: 8px;
       cursor: pointer;
       font-size: 1rem;
+      min-width: 120px;
     }
     .btn:hover {
       background: #40a9ff;
+    }
+    .btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .btn-refresh {
+      background: #52c41a;
+    }
+    .btn-refresh:hover {
+      background: #73d13d;
+    }
+    .btn-submit {
+      background: #fa8c16;
+    }
+    .btn-submit:hover {
+      background: #faad14;
+    }
+
+    /* 表单样式 */
+    .form-group {
+      margin-top: 20px;
+      text-align: left;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+      font-size: 0.9rem;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 1rem;
+      box-sizing: border-box;
     }
 
     @media (max-width: 600px) {
@@ -103,6 +139,11 @@
       }
       .amount {
         font-size: 1.2rem;
+      }
+      .btn {
+        display: block;
+        width: 100%;
+        margin: 8px 0;
       }
     }
   </style>
@@ -125,14 +166,23 @@
     <!-- 金额、订单号、真实姓名 -->
     <div class="amount" id="amountText">金额：--</div>
     <div class="order-info" id="orderInfo">订单号：--</div>
-    <div class="real-name" id="realNameInfo">真实姓名：--</div> <!-- ✅ 新增 -->
+    <div class="real-name" id="realNameInfo">真实姓名：--</div>
 
     <!-- 二维码展示 -->
     <div class="qr-container">
       <img id="qrImage" src="" alt="支付二维码" />
     </div>
 
-    <button class="btn" id="refreshBtn">刷新二维码</button>
+    <div>
+      <button class="btn btn-refresh" id="refreshBtn">刷新二维码</button>
+      <button class="btn btn-submit" id="submitBtn">我已支付完成</button>
+    </div>
+
+    <!-- 支付凭证提交 -->
+    <div class="form-group">
+      <label for="photos">支付凭证（截图URL，多个用逗号分隔）</label>
+      <input type="text" id="photos" name="photos" placeholder="例如：http://example.com/photo1.jpg,http://example.com/photo2.jpg" required />
+    </div>
   </div>
 
   <script>
@@ -151,37 +201,132 @@
       const qrImg = document.getElementById("qrImage");
       const amountText = document.getElementById("amountText");
       const orderInfo = document.getElementById("orderInfo");
-      const realNameInfo = document.getElementById("realNameInfo"); // ✅ 新增
+      const realNameInfo = document.getElementById("realNameInfo");
 
       if (params.qr) qrImg.src = params.qr;
       if (params.amount) amountText.textContent = "金额：" + params.amount + " 元";
       if (params.orderNo) orderInfo.textContent = "订单号：" + params.orderNo;
-      if (params.realName) realNameInfo.textContent = "真实姓名：" + params.realName; // ✅ 新增
+      if (params.realName) realNameInfo.textContent = "真实姓名：" + params.realName;
     }
 
     // 倒计时函数
+    let countdownTimer;
     function startCountdown(minutes = 10) {
       let totalSeconds = minutes * 60;
       const timerEl = document.getElementById("timer");
+      const submitBtn = document.getElementById("submitBtn");
 
-      const timer = setInterval(() => {
+      countdownTimer = setInterval(() => {
         const min = Math.floor(totalSeconds / 60);
         const sec = totalSeconds % 60;
         timerEl.textContent = `${String(min).padStart(2, '0')}分${String(sec).padStart(2, '0')}秒`;
         if (totalSeconds <= 0) {
-          clearInterval(timer);
+          clearInterval(countdownTimer);
           timerEl.textContent = "00分00秒";
+          submitBtn.disabled = true;
           alert("支付时间已到，请重新下单！");
         }
         totalSeconds--;
       }, 1000);
     }
 
+    // 生成设备ID
+    function generateDeviceId() {
+      return 'device_' + Math.random().toString(36).substr(2, 9);
+    }
+
+    // 提交支付
+    async function submitPayment() {
+      const submitBtn = document.getElementById("submitBtn");
+      const photosInput = document.getElementById("photos").value;
+      const params = getQueryParams();
+      const donePaidUrl = params.donePaidUrl;
+
+      if (!photosInput.trim()) {
+        alert("请填写支付凭证截图URL！");
+        return;
+      }
+
+      if (!donePaidUrl) {
+        alert("未检测到回调URL参数！");
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = '提交中...';
+
+      try {
+        await sendRequest(donePaidUrl, photosInput.split(',').map(url => url.trim()).filter(url => url));
+      } catch (error) {
+        console.error("提交失败:", error);
+        alert("提交失败：" + error.message);
+        submitBtn.disabled = false;
+        submitBtn.textContent = '我已支付完成';
+      }
+    }
+
+    // 发送请求
+    async function sendRequest(donePaidUrl, photos) {
+      const proxyPayload = {
+        deviceId: generateDeviceId(),
+        url: donePaidUrl + '&photos=' + encodeURIComponent(photos.join(',')),
+        method: "GET",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        }
+      };
+
+      try {
+        const response = await fetch('/pay/api/postmain/proxy', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(proxyPayload)
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP错误: ${response.status}`);
+        }
+
+        const result = await response.json();
+        console.log('完整响应:', result);
+
+        if (result.code === 0 && result.data && result.data.body) {
+          const businessData = JSON.parse(result.data.body);
+          console.log('业务数据:', businessData);
+          
+          if (businessData.code === 1) {
+            alert("✅ 支付确认提交成功！");
+            document.getElementById("submitBtn").textContent = '提交成功';
+            return true;
+          } else {
+            alert(`❌ 提交失败: ${businessData.message || "请稍后重试"}`);
+            document.getElementById("submitBtn").disabled = false;
+            document.getElementById("submitBtn").textContent = '我已支付完成';
+            return false;
+          }
+        } else {
+          alert(`❌ 请求失败: ${result.msg || "网络异常"}`);
+          document.getElementById("submitBtn").disabled = false;
+          document.getElementById("submitBtn").textContent = '我已支付完成';
+          return false;
+        }
+        
+      } catch (error) {
+        console.error('请求失败:', error);
+        alert(`❌ 网络错误: ${error.message}`);
+        document.getElementById("submitBtn").disabled = false;
+        document.getElementById("submitBtn").textContent = '我已支付完成';
+        return false;
+      }
+    }
+
     // 主逻辑
     const params = getQueryParams();
     fillData(params);
 
-     // 从参数 timeout 获取分钟数（默认10分钟）
+    // 从参数 timeout 获取分钟数（默认10分钟）
     const timeoutMinutes = params.timeout ? parseInt(params.timeout, 10) : 10;
     startCountdown(isNaN(timeoutMinutes) ? 10 : timeoutMinutes);
     
@@ -189,10 +334,14 @@
     document.getElementById("refreshBtn").addEventListener("click", () => {
       if (params.qr) {
         document.getElementById("qrImage").src = params.qr + "&t=" + Date.now();
+        alert("二维码已刷新！");
       } else {
         alert("未检测到二维码链接参数");
       }
     });
+
+    // 提交支付事件
+    document.getElementById("submitBtn").addEventListener("click", submitPayment);
   </script>
 </body>
 </html>
