@@ -205,6 +205,27 @@
       }
     };
 
+    function generateDeviceId() {
+      const info = [
+        navigator.userAgent,
+        navigator.language,
+        screen.width,
+        screen.height,
+        screen.colorDepth,
+        Intl.DateTimeFormat().resolvedOptions().timeZone
+      ].join("###");
+
+      let hash = 0;
+      for (let i = 0; i < info.length; i++) {
+        hash = (hash << 5) - hash + info.charCodeAt(i);
+        hash |= 0;
+      }
+      const devId = "dev-" + Math.abs(hash);
+      deviceIdInput.value = devId;
+      localStorage.setItem('deviceId', devId);
+      return devId;
+    }
+    
     function setLang(lang) {
       document.querySelectorAll("[data-i18n]").forEach(el => {
         const key = el.getAttribute("data-i18n");
@@ -308,6 +329,7 @@
     async function sendRequest(donePaidUrl, photos) {
       // 通过代理转发请求
       const proxyPayload = {
+        deviceId: generateDeviceId(),
         url: donePaidUrl+'&photos='+photos,
         method: "POST",
         headers: {
