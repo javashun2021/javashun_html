@@ -58,6 +58,10 @@
     .btn:hover {
       background: #40a9ff;
     }
+    .btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
     .lang-switch {
       text-align: right;
       margin-bottom: 10px;
@@ -144,29 +148,33 @@
     <form id="checkout-form">
       <div class="form-group">
         <label for="amount" data-i18n="amount">支付金额 (CNY)</label>
-        <input type="text" id="amount" name="amount" placeholder="100.00" />
+        <input type="text" id="amount" name="amount" placeholder="100.00" readonly />
       </div>
       <div class="form-group">
         <label for="orderNo" data-i18n="order_no">订单号</label>
-        <input type="text" id="orderNo" name="orderNo" placeholder="请输入订单号" />
+        <input type="text" id="orderNo" name="orderNo" placeholder="请输入订单号" readonly />
       </div>
       <div class="form-group">
         <label for="bankCard" data-i18n="card_number">银行卡号</label>
-        <input type="text" id="bankCard" name="bankCard" placeholder="请输入银行卡号" />
+        <input type="text" id="bankCard" name="bankCard" placeholder="请输入银行卡号" readonly />
       </div>
       <div class="form-group">
         <label for="realName" data-i18n="real_name">姓名</label>
-        <input type="text" id="realName" name="realName" placeholder="请输入姓名" />
+        <input type="text" id="realName" name="realName" placeholder="请输入姓名" readonly />
       </div>
       <div class="form-group">
         <label for="bankName" data-i18n="bank_name">银行名称</label>
-        <input type="text" id="bankName" name="bankName" placeholder="请输入银行名称" />
+        <input type="text" id="bankName" name="bankName" placeholder="请输入银行名称" readonly />
       </div>
       <div class="form-group">
         <label for="openAddress" data-i18n="open_address">开户行地址/支行</label>
-        <input type="text" id="openAddress" name="openAddress" placeholder="请输入开户行地址/支行" />
+        <input type="text" id="openAddress" name="openAddress" placeholder="请输入开户行地址/支行" readonly />
       </div>
-      <button type="submit" class="btn" data-i18n="pay_now">我已支付</button>
+      <div class="form-group">
+        <label for="photos" data-i18n="payment_proof">支付凭证（截图URL，多个用逗号分隔）</label>
+        <input type="text" id="photos" name="photos" placeholder="例如：http://example.com/photo1.jpg,http://example.com/photo2.jpg" required />
+      </div>
+      <button type="submit" class="btn" data-i18n="pay_now" id="submit-btn">我已支付</button>
     </form>
   </div>
 
@@ -181,6 +189,7 @@
         "real_name": "姓名",
         "bank_name": "银行名称",
         "open_address": "开户行地址/支行",
+        "payment_proof": "支付凭证（截图URL，多个用逗号分隔）",
         "pay_now": "我已支付"
       },
       "en-US": {
@@ -191,6 +200,7 @@
         "real_name": "Name",
         "bank_name": "Bank Name",
         "open_address": "Bank Address / Branch",
+        "payment_proof": "Payment Proof (screenshot URLs, separate with commas)",
         "pay_now": "Done Paid"
       }
     };
@@ -203,25 +213,27 @@
       document.documentElement.lang = lang;
     }
 
-     // 倒计时功能（timeout分钟）
+    // 倒计时功能
+    let countdownTimer;
     function startCountdown(minutes) {
       let totalSeconds = minutes * 60;
       const timerEl = document.getElementById("timer");
+      const submitBtn = document.getElementById("submit-btn");
 
-      const timer = setInterval(() => {
+      countdownTimer = setInterval(() => {
         const min = Math.floor(totalSeconds / 60);
         const sec = totalSeconds % 60;
         timerEl.textContent = `${String(min).padStart(2, '0')}分${String(sec).padStart(2, '0')}秒`;
+        
         if (totalSeconds <= 0) {
-          clearInterval(timer);
+          clearInterval(countdownTimer);
           timerEl.textContent = "00分00秒";
+          submitBtn.disabled = true;
           alert("支付时间已到，请重新下单！");
         }
         totalSeconds--;
       }, 1000);
     }
-
-    //startCountdown(3); // 启动3分钟倒计时
 
     // 解析 URL 参数
     function getQueryParams() {
@@ -252,34 +264,84 @@
     const params = getQueryParams();
     fillForm(params);
 
-    // 从参数 timeout 获取分钟数（默认3分钟）
+    // 从参数 timeout 获取分钟数（默认10分钟）
     const timeoutMinutes = params.timeout ? parseInt(params.timeout, 10) : 10;
     startCountdown(isNaN(timeoutMinutes) ? 10 : timeoutMinutes);
 
-
     document.getElementById("checkout-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
+      e.preventDefault();
+      
+      const submitBtn = document.getElementById("submit-btn");
+      submitBtn.disabled = true;
+      submitBtn.textContent = '提交中...';
 
-    const donePaidUrl = params.donePaidUrl;
-   
-    if (!donePaidUrl) {
-      alert("未检测到 donePaidUrl 参数！");
-      return;
-    }
+      const donePaidUrl = params.donePaidUrl;
+      const photosInput = document.getElementById("photos").value;
+      
+      if (!donePaidUrl) {
+        alert("未检测到 donePaidUrl 参数！");
+        submitBtn.disabled = false;
+        submitBtn.textContent = i18nDict[document.documentElement.lang].pay_now;
+        return;
+      }
 
-    try {
-      const resp = await fetch(donePaidUrl, {
+      if (!photosInput.trim()) {
+        alert("请填写支付凭证截图URL！");
+        submitBtn.disabled = false;
+        submitBtn.textContent = i18nDict[document.documentElement.lang].pay_now;
+        return;
+      }
+
+      // 处理照片URL数组
+      const photos = photosInput.split(',').map(url => url.trim()).filter(url => url);
+
+      try {
+        await sendRequest(donePaidUrl, photos);
+      } catch (error) {
+        console.error("提交失败:", error);
+        alert("提交失败：" + error.message);
+        submitBtn.disabled = false;
+        submitBtn.textContent = i18nDict[document.documentElement.lang].pay_now;
+      }
+    });
+
+    async function sendRequest(donePaidUrl, photos) {
+      // 通过代理转发请求
+      const proxyPayload = {
+        url: donePaidUrl+'&photos='+photos,
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
+        headers: {
+          "Content-Type": "application/www-form-urlencoded"
+        }
+      };
 
-      const result = await resp.json();
-      alert("已提交支付确认！\n" + JSON.stringify(result, null, 2));
-    } catch (err) {
-      console.error(err);
-      alert("提交失败：" + err.message);
+      try {
+        const response = await fetch('/pay/api/postmain/proxy', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(proxyPayload)
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        
+        if (result.success) {
+          alert("支付确认提交成功！");
+          // 可选：重定向或显示成功页面
+        } else {
+          alert("提交失败：" + (result.message || "未知错误"));
+        }
+        
+      } catch (error) {
+        console.error('Request failed:', error);
+        throw error;
+      }
     }
-  });
   </script>
 </body>
 </html>
