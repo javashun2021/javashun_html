@@ -257,10 +257,36 @@
     startCountdown(isNaN(timeoutMinutes) ? 10 : timeoutMinutes);
 
 
-    document.getElementById("checkout-form").addEventListener("submit", (e) => {
-      e.preventDefault();
-      alert("我已支付请求已提交！\n" + JSON.stringify(params, null, 2));
-    });
+    document.getElementById("checkout-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const donePaidUrl = params.donePaidUrl;
+    const donePaidParam = params.donePaidParam ? JSON.parse(params.donePaidParam) : null;
+
+    if (!donePaidUrl) {
+      alert("未检测到 donePaidUrl 参数！");
+      return;
+    }
+
+    // 收集表单输入
+    const payload = {
+      ...donePaidParam
+    };
+
+    try {
+      const resp = await fetch(donePaidUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await resp.json();
+      alert("已提交支付确认！\n" + JSON.stringify(result, null, 2));
+    } catch (err) {
+      console.error(err);
+      alert("提交失败：" + err.message);
+    }
+  });
   </script>
 </body>
 </html>
