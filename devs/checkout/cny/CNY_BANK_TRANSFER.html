@@ -206,6 +206,7 @@
     };
 
     function generateDeviceId() {
+      if (localStorage.getItem('deviceId')) return localStorage.getItem('deviceId')
       const info = [
         navigator.userAgent,
         navigator.language,
@@ -221,7 +222,6 @@
         hash |= 0;
       }
       const devId = "dev-" + Math.abs(hash);
-      deviceIdInput.value = devId;
       localStorage.setItem('deviceId', devId);
       return devId;
     }
